@@ -513,7 +513,7 @@ async function askAI(rules, turns, wantJson){
 function worldBrief(){
   const arc = S.fever && !S.fever.done && !S.fever.failed ? `The infant Wren has a dangerous fever. Feverbark from the village of Low Fennick would cure it, and ${feverLeft()} day(s) remain.` : S.fever && S.fever.failed ? 'The Stranger failed to fetch feverbark in time. Tobiah made the walk himself and can no longer walk at all. Wren lived.' : S.fever && S.fever.done ? 'The Stranger fetched the feverbark that broke the infant Wren\'s fever.' : '';
   return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one hut, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
-The player is "the Stranger", who appeared from another world (ours), out of shape and in socks, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
+The player is "the Stranger", who appeared from another world (ours), out of shape and wearing Crocs, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
 The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
 Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}`;
 }
@@ -573,13 +573,13 @@ const INTRO = [
   {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into cold grass and stars',
    html:'<p>You are on the couch with a bag of chips on your chest, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>'},
   {img:'intro-wake', eye:'Somewhere else', alt:'You, flat on your back in frosted grass under a huge sky of stars',
-   html:'<p>When it stops you are lying in cold grass under a sky with no wires in it. No street, no hum, no light but stars.</p><p>You are out of breath from doing nothing, and you are in your socks.</p>'},
+   html:'<p>When it stops you are lying in cold grass under a sky with no wires in it. No street, no hum, no light but stars.</p><p>You are out of breath from doing nothing, and all you have on your feet is a pair of Crocs.</p>'},
   {img:'intro-ridge', eye:'The ridge', alt:'You, trudging uphill through frosty grass toward a thread of smoke on a far ridge at dawn',
    html:'<p>By dawn you can see one thread of smoke on a far ridge. It is the only sign of anyone.</p><p>It is the longest walk you have taken in years. You stop four times. You keep going.</p>'},
   {img:'intro-spear', eye:'Hollow Ash', alt:'A woman in a worn cloak levels a spear at you while the camp watches from the fire',
    html:'<p>The smoke is a camp: one hut, a fire, eleven people who look like they have been running for a long time. A spear point stops you at the edge of it.</p><p>The woman holding it is called Maren. She studies you for a while. <span class="say">"You work, you eat,"</span> she says. <span class="say">"You sleep outside. That is the offer."</span></p>'},
-  {img:'intro-edge', eye:'First night', alt:'You, alone under a blanket at the edge of the firelight with an empty bowl, the others gathered at the fire',
-   html:'<p>They give you a blanket, a bowl, and a spot where the firelight runs out. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
+  {img:'intro-edge', eye:'First night', alt:'You, wrapped in a blanket by the campfire with a bowl, the others watching from across the flames',
+   html:'<p>They give you a blanket, a bowl, and a place at the fire, on the far side from everyone else. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
 ];
 const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
 function taskRow(id, arc){
@@ -606,7 +606,7 @@ function render(){
     if (!last) new Image().src = 'art/' + INTRO[introStep + 1].img + '.jpg';
     $('begin').onclick = () => {
       if (!last){ introStep++; render(); window.scrollTo(0, 0); return; }
-      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a spot at the edge of the embers and nothing else.'); save(); render(); window.scrollTo(0, 0);
+      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a place by the fire, a blanket, and nothing else.'); save(); render(); window.scrollTo(0, 0);
     };
     if (introStep) $('introBack').onclick = () => { introStep--; render(); window.scrollTo(0, 0); };
   } else if (!S.home){
