@@ -95,6 +95,8 @@ textarea{resize:vertical;line-height:1.4}
 label{font-weight:600}
 a{color:var(--water)}
 .introdots{display:flex;gap:6px;justify-content:center;margin:14px 0}.introdots i{width:8px;height:8px;background:var(--line)}.introdots i.on{background:var(--ember)}
+.lochelp{border-top:1px solid var(--line);padding:.6rem 0}.lochelp summary{cursor:pointer;font-weight:600;min-height:28px}.lochelp ol{margin:.5rem 0 0;padding-left:1.25rem}.lochelp li{margin:.4rem 0;font-size:.9375rem;line-height:1.45}.lochelp.top{border:0;margin-top:.75rem}.lochelp.top>summary{color:var(--muted);font-weight:400}.lochelpbox{margin-top:.75rem}
+.privbox{margin:.75rem 0;border-left:3px solid var(--moss)}.privbox p{margin:0}.lochelp.priv{border:0;padding:.4rem 0 0}.lochelp.priv>summary{color:var(--moss);font-weight:500;font-size:.9375rem}
 </style>
 
 <div class="app">
@@ -190,6 +192,7 @@ a{color:var(--water)}
       <button class="quiet" id="moveHome">Move home base</button>
       <button class="quiet" id="resetBtn">Start the story over</button>
     </section>
+    <div id="privJournal"></div>
     <p class="small muted">Your home location and progress are saved only in this browser on this phone. Destinations come from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors and are not checked by anyone. Use your own judgment about where it is safe and allowed to walk, and skip any place that isn't.</p>
   </div>
 </div>
@@ -343,14 +346,55 @@ function newDay(){
 const feverLeft = () => S.fever && !S.fever.done && !S.fever.failed ? S.fever.days - dayDiff(S.fever.start, today()) : 0;
 
 /* ---------- position sources ---------- */
-let pos = null, watchId = null, geoError = '', wantHome = 0, sim = null;
+let pos = null, watchId = null, geoError = '', geoBlocked = false, wantHome = 0, sim = null;
+const LOCHELP = {
+  ios: ['iPhone or iPad, Safari', [
+    'Open the <b>Settings</b> app, then <b>Privacy &amp; Security</b>, then <b>Location Services</b>. Make sure Location Services is on.',
+    'In that same list tap <b>Safari Websites</b>. Choose <b>While Using the App</b> and turn on <b>Precise Location</b>.',
+    'Come back to this page in Safari. Tap the button at the left end of the address bar, then <b>Website Settings</b>, and set <b>Location</b> to <b>Allow</b>.',
+    'Tap <b>Try again</b> below. When the phone asks, tap <b>Allow</b>.']],
+  ioschrome: ['iPhone or iPad, Chrome', [
+    'Open the <b>Settings</b> app, then <b>Privacy &amp; Security</b>, then <b>Location Services</b>. Make sure Location Services is on.',
+    'In that same list tap <b>Chrome</b>. Choose <b>While Using the App</b> and turn on <b>Precise Location</b>.',
+    'Come back to this page and tap <b>Try again</b> below. When Chrome asks, tap <b>Allow</b>.']],
+  android: ['Android, Chrome', [
+    'Swipe down from the top of the screen and make sure <b>Location</b> is turned on for the phone.',
+    'In Chrome, tap the small icon at the left end of the address bar, then <b>Permissions</b>, then <b>Location</b>, and choose <b>Allow</b>.',
+    'If there is no Location line there: tap the three dots, then <b>Settings</b>, <b>Site settings</b>, <b>Location</b>. Find this site under Blocked and change it to Allow.',
+    'If Chrome itself is not allowed: phone <b>Settings</b>, <b>Apps</b>, <b>Chrome</b>, <b>Permissions</b>, <b>Location</b>, then <b>Allow only while using the app</b> with precise location on.',
+    'Come back and tap <b>Try again</b> below.']],
+  desktop: ['Computer', [
+    'Click the icon at the left end of the address bar, next to the web address.',
+    'Find <b>Location</b> and switch it to <b>Allow</b>, then reload the page.',
+    'A computer only knows roughly where it is. The game is meant to be played on a phone you carry.']]
+};
+const platform = () => { const u = navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1) ? (/CriOS/.test(u) ? 'ioschrome' : 'ios') : /Android/.test(u) ? 'android' : 'desktop'; };
+const PRIVACY = `<details class="lochelp priv"><summary>We do not track your location. Details</summary><ol>
+  <li>There is no account and no game server. Nobody running this game ever receives where you are or where you live.</li>
+  <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
+  <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide. Your exact position is never sent.</li>
+  <li>If you tap the walking directions link, Google Maps opens with the destination. That is the only time a precise place leaves the game, and only when you tap it.</li>
+  <li>The villager AI voices never receive your location, your parks or your home.</li>
+  <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
+function locHelp(open){
+  const mine = platform();
+  const block = (k, o) => `<details class="lochelp"${o ? ' open' : ''}><summary>${LOCHELP[k][0]}${k === mine ? ' (this device)' : ''}</summary><ol>${LOCHELP[k][1].map(x => `<li>${x}</li>`).join('')}</ol></details>`;
+  return `<div class="panel lochelpbox"><h3>${geoBlocked ? 'Location is turned off for this page' : 'How to turn on location'}</h3>
+    <p class="small">The game uses your location to measure your walk and to know when you reach a park or get home. Your location is not tracked or stored by anyone. It stays on this phone.</p>
+    ${block(mine, open)}${Object.keys(LOCHELP).filter(k => k !== mine).map(k => block(k, false)).join('')}
+    <details class="lochelp"><summary>Still not working?</summary><ol>
+      <li>If you opened this link inside another app, such as Messages, Facebook or Instagram, open it in Safari or Chrome instead. In-app browsers often cannot share location.</li>
+      <li>Private or incognito tabs may forget the permission. Use a normal tab.</li>
+      <li>Step outside or near a window. GPS is weak indoors.</li>
+      <li>Close the tab, open the link again, and tap Allow when asked.</li></ol></details></div>`;
+}
 function startGPS(){
   if (practice || watchId !== null) return;
   if (!('geolocation' in navigator)){ geoError = 'This browser has no location service.'; render(); return; }
   watchId = navigator.geolocation.watchPosition(
-    p => { geoError = ''; onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); },
+    p => { geoError = ''; geoBlocked = false; onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); },
     e => {
-      if (e.code === 1){ geoError = 'Location is blocked for this page. Allow it in your browser settings, or try practice mode.'; wantHome = 0; stopGPS(); }
+      if (e.code === 1){ geoBlocked = true; geoError = 'Location is blocked for this page. Follow the steps below to allow it, or try practice mode.'; wantHome = 0; stopGPS(); }
       else if (!pos) geoError = 'Still looking for a GPS signal. Step outside if you can.';
       render();
     },
@@ -391,7 +435,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden){ new
 let tried = [], scouting = false;
 async function findPark(oneWay){
   if (practice) return null;
-  const q = `[out:json][timeout:12];nwr["leisure"~"^(park|pitch|recreation_ground|nature_reserve|common)$"]["access"!~"^(private|no)$"](around:${Math.round(oneWay * 1.6)},${S.home.lat},${S.home.lng});out center tags 80;`;
+  const q = `[out:json][timeout:12];nwr["leisure"~"^(park|pitch|recreation_ground|nature_reserve|common)$"]["access"!~"^(private|no)$"](around:${Math.round(oneWay * 1.6) + 900},${S.home.lat.toFixed(2)},${S.home.lng.toFixed(2)});out center tags 200;`;
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 14000);
   try {
     const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal});
@@ -581,7 +625,7 @@ const INTRO = [
   {img:'intro-edge', eye:'First night', alt:'You, wrapped in a blanket by the campfire with a bowl, the others watching from across the flames',
    html:'<p>They give you a blanket, a bowl, and a place at the fire, on the far side from everyone else. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
 ];
-const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
+const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
 function taskRow(id, arc){
   const T = TASKS[id], done = S.board.done[id];
   return `<li class="${arc ? 'arc' : ''}">
@@ -613,14 +657,17 @@ function render(){
     el.innerHTML = `${pic('village', 'scene', 'Hollow Ash at dusk')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
       <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
       ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p>' : ''}
+      ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
+      ${!practice && !wantHome && !geoError ? '<p class="small muted">Your phone will ask to share your location. Tap <b>Allow</b>.</p>' : ''}
       ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
       <div class="row">
-        <button class="primary grow" id="setHome">${practice ? 'Set practice camp' : 'Set camp here'}</button>
+        <button class="primary grow" id="setHome">${practice ? 'Set practice camp' : geoBlocked ? 'Try again' : 'Set camp here'}</button>
         ${practice ? '' : '<button class="grow" id="goPractice">Try practice mode</button>'}
-      </div>`;
+      </div>
+      ${practice ? '' : geoBlocked ? locHelp(true) : '<details class="lochelp top"><summary>Trouble with location?</summary>' + locHelp(true) + '</details>'}`;
     $('setHome').onclick = () => {
       if (practice){ sim = {lat:44.98, lng:-93.27}; S.home = {...sim}; newDay(); pos = {...sim, acc:5, t:Date.now(), sim:true}; render(); }
-      else { wantHome = Date.now(); geoError = ''; startGPS(); render(); if (pos) onFix(pos); }
+      else { wantHome = Date.now(); geoError = ''; geoBlocked = false; startGPS(); render(); if (pos) onFix(pos); }
     };
     if ($('goPractice')) $('goPractice').onclick = () => setPractice(true);
   } else if (m && m.phase === 'battle'){
@@ -700,7 +747,7 @@ function tick(){
     $('dBig').textContent = fmtDist(dist(pos, tg));
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
-  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoError || 'Waiting for GPS.'; }
+  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Waiting for GPS.'; }
   $('sWalk').textContent = fmtDist(m.meters);
   $('sTime').textContent = fmtTime(Date.now() - m.t0);
   $('sSteps').textContent = Math.round(m.meters / 0.78).toLocaleString();
@@ -839,7 +886,8 @@ setInterval(() => { if (S.mission){ if (S.mission.phase === 'battle') tick(); el
 window.addEventListener('resize', drawRadar);
 
 /* ---------- boot ---------- */
-function boot(){
+function fillPrivacy(){ const e = $('privJournal'); if (e) e.innerHTML = '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are.</p>' + PRIVACY + '</div><details class="lochelp top"><summary>Location help</summary>' + locHelp(false) + '</details>'; }
+function boot(){ fillPrivacy();
   if (S.home) newDay();
   if (practice){ if (S.home){ sim = S.mission && S.mission.lastFix ? {lat:S.mission.lastFix.lat, lng:S.mission.lastFix.lng} : {...S.home}; pos = {...sim, acc:5, t:Date.now(), sim:true}; } }
   else if (S.home) startGPS();
