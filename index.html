@@ -97,6 +97,14 @@ a{color:var(--water)}
 .introdots{display:flex;gap:6px;justify-content:center;margin:14px 0}.introdots i{width:8px;height:8px;background:var(--line)}.introdots i.on{background:var(--ember)}
 .lochelp{border-top:1px solid var(--line);padding:.6rem 0}.lochelp summary{cursor:pointer;font-weight:600;min-height:28px}.lochelp ol{margin:.5rem 0 0;padding-left:1.25rem}.lochelp li{margin:.4rem 0;font-size:.9375rem;line-height:1.45}.lochelp.top{border:0;margin-top:.75rem}.lochelp.top>summary{color:var(--muted);font-weight:400}.lochelpbox{margin-top:.75rem}
 .privbox{margin:.75rem 0;border-left:3px solid var(--moss)}.privbox p{margin:0}.lochelp.priv{border:0;padding:.4rem 0 0}.lochelp.priv>summary{color:var(--moss);font-weight:500;font-size:.9375rem}
+.rmap{position:relative;overflow:hidden;aspect-ratio:16/10;margin:.75rem 0;border:1px solid var(--line);background:#DDE3DA}
+.rmap-in{position:absolute;left:50%;top:50%;width:640px;height:360px;transform:translate(-50%,-50%)}
+.rmap-in img{position:absolute;width:256px;height:256px;max-width:none}
+.rmap-in svg{position:absolute;inset:0}.rmap-in line{stroke:#C2410C;stroke-width:4;stroke-dasharray:3 9;stroke-linecap:round}
+.rmap .pin{position:absolute;transform:translate(-50%,calc(-100% - 9px));padding:3px 8px;font:600 .8125rem/1.2 Barlow,system-ui,sans-serif;white-space:nowrap;border:2px solid #14110F}
+.rmap .pin::after{content:"";position:absolute;left:50%;bottom:-11px;width:10px;height:10px;margin-left:-7px;border-radius:50%;border:2px solid #14110F;background:inherit}
+.rmap .pin.home{background:#fff;color:#14110F}.rmap .pin.dest{background:var(--ember);color:var(--on-ember)}
+.rmap-credit{position:absolute;right:0;bottom:0;padding:1px 6px;font-size:.6875rem;background:rgba(255,255,255,.85);color:#1F2937}
 </style>
 
 <div class="app">
@@ -373,6 +381,7 @@ const PRIVACY = `<details class="lochelp priv"><summary>We do not track your loc
   <li>There is no account and no game server. Nobody running this game ever receives where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
   <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide. Your exact position is never sent.</li>
+  <li>The street map of a destination is loaded from OpenStreetMap as map squares covering the neighborhood, so that service can tell which neighborhood is being looked at, but not the spot inside it.</li>
   <li>If you tap the walking directions link, Google Maps opens with the destination. That is the only time a precise place leaves the game, and only when you tap it.</li>
   <li>The villager AI voices never receive your location, your parks or your home.</li>
   <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
@@ -626,6 +635,19 @@ const INTRO = [
    html:'<p>They give you a blanket, a bowl, and a place at the fire, on the far side from everyone else. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
 ];
 const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
+function realMap(a, b){
+  const W = 640, H = 360, px = (p, z) => { const n = 256 * 2 ** z, r = p.lat * Math.PI / 180; return {x:(p.lng + 180) / 360 * n, y:(1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n}; };
+  let z = 16; for (; z > 11; z--){ const A = px(a, z), B = px(b, z); if (Math.abs(A.x - B.x) < 190 && Math.abs(A.y - B.y) < 110) break; }
+  const A = px(a, z), B = px(b, z), ox = Math.round((A.x + B.x) / 2 - W / 2), oy = Math.round((A.y + B.y) / 2 - H / 2), n = 2 ** z;
+  let t = '';
+  for (let ty = Math.floor(oy / 256); ty * 256 < oy + H; ty++) for (let tx = Math.floor(ox / 256); tx * 256 < ox + W; tx++)
+    if (ty >= 0 && ty < n) t += `<img alt="" src="https://tile.openstreetmap.org/${z}/${((tx % n) + n) % n}/${ty}.png" style="left:${tx * 256 - ox}px;top:${ty * 256 - oy}px" onerror="this.style.visibility='hidden'">`;
+  const ax = A.x - ox, ay = A.y - oy, bx = B.x - ox, by = B.y - oy;
+  return `<div class="rmap"><div class="rmap-in" role="img" aria-label="Street map showing camp and the destination">${t}
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/></svg>
+    <span class="pin home" style="left:${ax}px;top:${ay}px">Camp</span><span class="pin dest" style="left:${bx}px;top:${by}px">Go here</span></div>
+    <a class="rmap-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a></div>`;
+}
 function taskRow(id, arc){
   const T = TASKS[id], done = S.board.done[id];
   return `<li class="${arc ? 'arc' : ''}">
@@ -708,6 +730,7 @@ function render(){
     const o = S.offer, T = TASKS[o.id];
     el.innerHTML = `${pic('s-' + artFor(T), 'scene', 'The ' + SITE[T.res])}<div class="thead">${pic('p-' + T.g, 'face sm')}<div><p class="eyebrow">${PEOPLE[T.g].name} sends you</p><h2>${T.t}</h2></div></div>
       <p><b>${o.name ? esc(o.name) : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${fmtDist(o.oneWay * 2)} there and back in a straight line, more by road.</p>
+      ${practice ? '' : realMap(S.home, o.site)}
       <p class="small muted">${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">Find another place</button></div>
       <button class="quiet" id="back">Back to the board</button>`;
