@@ -63,6 +63,8 @@ button:focus-visible,.linkbtn:focus-visible,input:focus-visible,select:focus-vis
 .thead > div{min-width:0;flex:1}
 .tag{display:inline-block;font:400 1rem/1.2 var(--display);letter-spacing:.04em;padding:.1rem .45rem;border-radius:2px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .tag.fight{border-color:var(--ember);color:var(--ember)}
+.people li.gone img{filter:grayscale(1);opacity:.45} .people li.gone .say{font-style:normal;color:var(--warn)}
+.alarm{border-left:4px solid var(--ember);padding:.25rem 0 .25rem .75rem}
 .tag.done{border-color:var(--moss);color:var(--moss)}
 canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--bg);border:2px solid var(--line)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
@@ -142,6 +144,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
     <section>
       <p class="eyebrow">Your place in camp</p>
       <dl class="status" id="place" style="margin-top:.5rem"></dl>
+      <div id="restBox" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem"></div>
     </section>
     <section>
       <p class="eyebrow">Since you arrived</p>
@@ -230,7 +233,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 
 /* ---------- world data ---------- */
 const RES = {wood:'Firewood', water:'Water', food:'Food', stone:'Stone', fiber:'Reed fiber', herbs:'Herbs'};
-const SITE = {wood:'grove', water:'spring', food:'meadow', stone:'quarry', fiber:'reed bank', herbs:'hedgerow', feverbark:'crossing to Low Fennick'};
+const SITE = {wood:'grove', water:'spring', food:'meadow', stone:'quarry', fiber:'reed bank', herbs:'hedgerow', feverbark:'crossing to Low Fennick', captive:'Tallymen stockade'};
 const PEOPLE = {
   maren:{name:'Maren', role:'Leader. Ferrywoman who got them out.', lines:[
     ['You work, you eat. You sleep outside the hut until I say otherwise.', 'Last stranger we trusted, the town burned. Do not ask me to be warm.'],
@@ -267,7 +270,8 @@ const TASKS = {
   stone:   {g:'maren',  t:'Stone for the fire ring', d:'A fire with no ring is a fire that spreads. They have seen enough of that.', res:'stone', km:1.6, tr:1},
   snare:   {g:'dack',   t:'Take back the snare line', d:'Tallymen scouts have been lifting the camp snares at the commons. Dack wants them run off, and he wants to see if you will go.', res:'food', km:3.2, tr:2, battle:'foe'},
   grove:   {g:'maren',  t:'Hold the far grove', d:'The Tallymen cut their mark into the best timber. Maren wants it cut out again.', res:'wood', km:3.2, tr:2, battle:'foe'},
-  fever:   {g:'tobiah', t:'Feverbark from Low Fennick', d:'Wren has a fever that will not break. The only feverbark is in the next village, past a crossing the Tallymen hold. Tobiah cannot make the walk. You can.', res:'feverbark', km:3.2, tr:0, battle:'foe', arc:true}
+  fever:   {g:'tobiah', t:'Feverbark from Low Fennick', d:'Wren has a fever that will not break. The only feverbark is in the next village, past a crossing the Tallymen hold. Tobiah cannot make the walk. You can.', res:'feverbark', km:3.2, tr:0, battle:'foe', arc:true},
+  rescue:  {g:'maren',  t:'Bring them back from the stockade', d:'', res:'captive', km:3.2, tr:0, battle:'foe', rescue:true}
 };
 const POOLS = [['water','softfood','race'], ['firewood','reeds','bark','stone'], ['snare','grove']];
 const BUILDS = [
@@ -281,7 +285,7 @@ const BUILDS = [
 const RANKS = [[0,'Stranger'],[6,'Hauler'],[14,'Forager'],[24,'Scout'],[36,'Warden']];
 const MOVES = [{n:'jumping jacks', base:20}, {n:'squats', base:15}, {n:'push-ups', base:8}, {n:'high knees', base:30}];
 const TINT = {wood:'#B98A5A', water:'#66BDD8', food:'#6FC694', stone:'#A7B0B8', fiber:'#D8C56A', herbs:'#C58BD0'};
-const artFor = T => T.res === 'feverbark' ? 'crossing' : T.res === 'herbs' ? 'food' : T.res;
+const artFor = T => T.res === 'feverbark' || T.res === 'captive' ? 'crossing' : T.res === 'herbs' ? 'food' : T.res;
 const pic = (src, cls, alt) => `<img class="${cls}" src="art/${src}.jpg" alt="${alt || ''}" onerror="this.hidden=true">`;
 const MAX_WALK_SPEED = 7, ARRIVE_M = 45, BATTLE_SECS = 120;
 
@@ -339,6 +343,56 @@ function addTrust(who, n){ S.trust[who] = Math.max(0, Math.min(10, S.trust[who] 
 
 /* ---------- days, upkeep, arcs ---------- */
 function hash(s){ let h = 2166136261; for (const c of s){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const addDays = (d, n) => new Date(new Date(d + 'T12:00').getTime() + n * 864e5).toLocaleDateString('en-CA');
+const taken = () => S.taken || (S.taken = {});
+const takenList = () => Object.keys(taken()).sort((a, b) => taken()[a] < taken()[b] ? -1 : 1);
+const names = l => l.map(k => PEOPLE[k].name).join(' and ');
+const neglect = () => S.neglect || (S.neglect = {lastHelp:today(), stage:0, restUntil:'', rests:2});
+const helpBase = () => { const N = neglect(); return N.restUntil > N.lastHelp ? N.restUntil : N.lastHelp; };
+const resting = () => neglect().restUntil >= today();
+function neglectStep(stage, t){
+  if (stage === 1){ addTrust('dack', -1); note('Two Tallymen scouts sat on the ridge all day, counting the people around the fire. You were not among them.' + (taken().dack ? '' : ' Dack has not put his bow down since.')); return; }
+  if (stage === 2){ addTrust('maren', -1); addTrust('isla', -1); note('Someone cut a tally mark into the hut door in the night. Maren says that is how they mark a camp with nobody left to guard it. One more day like this and they come.'); return; }
+  const free = ['pip', 'oona', 'dack'].filter(k => !taken()[k]);
+  if (!free.length){
+    S.stock.food = Math.floor(S.stock.food / 2); S.stock.water = Math.floor(S.stock.water / 2);
+    note('The Tallymen came back and you were not here. There was nobody left worth taking, so they took half the food and water instead.'); return;
+  }
+  const who = free[hash(t + S.first + stage) % free.length], n = PEOPLE[who].name;
+  taken()[who] = t; addTrust('maren', -1); S.board = null;
+  if (S.offer && TASKS[S.offer.id].g === who) S.offer = null;
+  if (openTalk === who) openTalk = '';
+  note('The Tallymen came at dusk and you were not here. They took ' + n + ' to their stockade as the share this camp owes. Maren has not sat down since. She wants ' + n + ' back.');
+}
+function runNeglect(t){
+  if (!S.home) return;
+  const N = neglect(), missed = dayDiff(helpBase(), t) - 1;
+  const want = missed >= 6 ? 4 : missed >= 4 ? 3 : missed >= 3 ? 2 : missed >= 2 ? 1 : 0;
+  while (N.stage < want){ N.stage++; neglectStep(N.stage, t); }
+}
+function campState(){
+  const N = neglect(), t = today(), tk = takenList();
+  if (N.lastHelp === t && S.stats.tasks) return {mood:'Safe', line:'You carried for the camp today. The ridge is empty.', warn:''};
+  if (resting()) return {mood:'Resting', line:'Maren gave you leave. Nobody counts these days against you. Back to work after ' + new Date(N.restUntil + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) + '.', warn:''};
+  const m1 = dayDiff(helpBase(), t);
+  const next = m1 === 2 ? 'Tallymen scouts will be on the ridge by morning' : m1 === 3 ? 'the Tallymen will mark the hut door tonight' : m1 === 4 || m1 === 6 ? 'the Tallymen will come tonight and take someone' : '';
+  const warn = next ? 'If you finish no task today, ' + next + '.' : '';
+  if (N.stage >= 3) return {mood:'Raided', line:tk.length ? 'The Tallymen hold ' + names(tk) + '. The camp is quiet in the wrong way.' : 'The Tallymen have been through here. Everyone is back, and nobody sleeps well.', warn};
+  if (N.stage === 2) return {mood:'Marked', line:'There is a tally mark cut into the hut door. They are coming.', warn};
+  if (N.stage === 1) return {mood:'Watched', line:'Tallymen scouts are on the ridge, counting heads.', warn};
+  if (tk.length) return {mood:'Grieving', line:'The Tallymen still hold ' + names(tk) + '.', warn};
+  return {mood:m1 >= 2 ? 'Uneasy' : 'Steady', line:m1 >= 2 ? 'They managed without you yesterday. They noticed.' : 'The fire is lit and everyone is accounted for.', warn};
+}
+function takeRest(){
+  const N = neglect(); if (N.rests < 1 || resting()) return;
+  N.rests--; N.restUntil = addDays(today(), 1);
+  note('You told Maren you needed to rest. She looked at you for a while, then nodded. "Two days. Then I need you back."');
+  save(); render();
+}
+function makeBoard(t){
+  const h = hash(t + S.first);
+  S.board = {date:t, ids:POOLS.map((p, i) => { const ok = p.filter(id => !taken()[TASKS[id].g]), q = ok.length ? ok : p; return q[(h >>> (i * 5)) % q.length]; }), done:{}};
+}
 function newDay(){
   const t = today();
   if (S.seen !== t){
@@ -355,10 +409,8 @@ function newDay(){
       note('You did not go. Tobiah made the walk to Low Fennick himself and came back on a litter. Wren will live. He will not walk again, and Isla does not look at you.');
     }
   }
-  if (!S.board || S.board.date !== t){
-    const h = hash(t + S.first);
-    S.board = {date:t, ids:POOLS.map((p, i) => p[(h >>> (i * 5)) % p.length]), done:{}};
-  }
+  runNeglect(t);
+  if (!S.board || S.board.date !== t) makeBoard(t);
   if (!S.fever && standing() >= 5){
     S.fever = {start:t, days:3, done:false, failed:false};
     note('Wren has a fever that will not break. Tobiah says feverbark would do it, and the nearest is in Low Fennick. He looked at his knee, then at you.');
@@ -534,8 +586,8 @@ async function addRoute(o){
 // and every later task of that kind sends you back to the same ground.
 const places = () => S.places || (S.places = {});
 const placeKey = T => T.res + (T.km > 2 ? '-far' : '');
-const placeName = k => (k.endsWith('-far') ? 'far ' : '') + SITE[k.replace('-far', '')];
-const PLACE_TINT = {...TINT, feverbark:'#FF6B6B', 'wood-far':'#E0703A', 'food-far':'#2FB8A0', 'water-far':'#4F8FE8', 'stone-far':'#7C8FA6', 'fiber-far':'#B8A030', 'herbs-far':'#9A6BD8'};
+const placeName = k => k === 'captive-far' ? SITE.captive : (k.endsWith('-far') ? 'far ' : '') + SITE[k.replace('-far', '')];
+const PLACE_TINT = {...TINT, feverbark:'#FF6B6B', 'captive-far':'#D64545', 'wood-far':'#E0703A', 'food-far':'#2FB8A0', 'water-far':'#4F8FE8', 'stone-far':'#7C8FA6', 'fiber-far':'#B8A030', 'herbs-far':'#9A6BD8'};
 const placeColor = k => PLACE_TINT[k] || PLACE_TINT[k.replace('-far', '')] || '#FF8A4C';
 const ptKey = p => p.lat.toFixed(4) + ',' + p.lng.toFixed(4);
 async function pickSite(oneWay){
@@ -618,7 +670,7 @@ function startMission(){
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
 }
-const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc ? 1.5 : 1));
+const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1));
 function arrive(){
   const m = S.mission; buzz();
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
@@ -645,7 +697,16 @@ function unload(){
   if (m.won === true) notes.push(T.battle === 'dare' ? 'You beat the dare' : 'You held your ground');
   if (m.ride > planned * 0.3){ haul = Math.ceil(haul / 2); notes.push('Part of that was too fast to be on foot, so it counts for less'); }
   else if (!simd && speed >= 2.4){ tr += 1; notes.push('You ran it. ' + PEOPLE[T.g].name + ' noticed'); }
-  if (T.arc){
+  let freed = '';
+  if (T.rescue){
+    haul = 0; tr = 0; notes.length = 0;
+    const who = takenList()[0];
+    if (m.won && who){
+      const n = PEOPLE[who].name; freed = who; delete S.taken[who]; addTrust(who, 2); addTrust('maren', 1);
+      notes.push('You broke the guard at the stockade and walked ' + n + ' out');
+      note('You walked ' + n + ' out of the Tallymen stockade and all the way home. ' + n + ' did not let go of your sleeve until the fire was in sight. Maren put a bowl in your hands herself.');
+    } else { notes.push('The guards drove you off. Rest, then go again'); note('The Tallymen drove you off at the stockade. Whoever they hold is still in there. Maren says go again.'); }
+  } else if (T.arc){
     S.fever.done = true; addTrust('isla', 3); addTrust('tobiah', 2); addTrust('maren', 1);
     if (m.won === false){ S.stock.food = Math.max(0, S.stock.food - 3); notes.push('The Tallymen took their toll in food at the crossing'); }
     note('You put the feverbark in Tobiah\'s hands with a day\'s walk still in your legs. By morning Wren was cool to the touch. Isla held your arm and did not let go for a while.');
@@ -653,10 +714,12 @@ function unload(){
   } else {
     S.stock[T.res] += haul; addTrust(T.g, tr);
   }
-  S.board.done[m.id] = true;
+  if (!T.rescue) S.board.done[m.id] = true;
+  { const N = neglect(); N.lastHelp = today(); N.stage = 0; }
   const steps = Math.round(m.meters / 0.78);
   S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
-  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes};
+  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed};
+  if (S.stats.tasks % 5 === 0 && neglect().rests < 3){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
   S.mission = null;
   if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
   if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
@@ -714,7 +777,7 @@ function worldBrief(){
   return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one hut, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
 The player is "the Stranger", who appeared from another world (ours), out of shape and wearing Crocs, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
 The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
-Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}`;
+Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
 }
 function charRules(k){
   const p = PEOPLE[k], t = S.trust[k];
@@ -842,6 +905,13 @@ function updateCompass(){
 }
 function taskRow(id, arc){
   const T = TASKS[id], done = S.board.done[id];
+  if (T.rescue){
+    const tk = takenList(), held = dayDiff(taken()[tk[0]], today());
+    return `<li class="arc"><div class="thead">${pic('p-' + tk[0], 'face sm')}<div class="who"><h3>Bring ${PEOPLE[tk[0]].name} back from the stockade</h3><span class="tag fight">Contested</span></div></div>
+    <p class="small">The Tallymen hold ${names(tk)} in their stockade. Maren cannot spare anyone to go. Walk there, break the guard, and walk ${PEOPLE[tk[0]].name} home.${tk.length > 1 ? ' One trip brings one of them back.' : ''}</p>
+    <p class="small muted num">From Maren. About ${fmtDist(T.km * 1000)} round trip. Held ${held < 1 ? 'since last night' : held + (held === 1 ? ' day' : ' days')}.</p>
+    <button data-t="rescue" class="primary">Go and get ${PEOPLE[tk[0]].name}</button></li>`;
+  }
   return `<li class="${arc ? 'arc' : ''}">
     <div class="thead">${pic('p-' + T.g, 'face sm')}<div class="who"><h3>${T.t}</h3>${done ? '<span class="tag done">Done</span>' : T.battle ? `<span class="tag fight">${T.battle === 'dare' ? 'Dare' : 'Contested'}</span>` : ''}</div></div>
     <p class="small">${T.d}</p>
@@ -887,12 +957,12 @@ function render(){
   } else if (m && m.phase === 'battle'){
     const T = TASKS[m.id], mv = MOVES[m.move], dare = T.battle === 'dare';
     el.innerHTML = `${dare ? pic('p-pip', 'scene strip', 'Pip, grinning') : pic('s-crossing', 'scene strip', 'Two hooded Tallymen scouts')}<p class="eyebrow">${dare ? 'The dare' : 'The ' + SITE[T.res] + ' is held'}</p>
-      <h2>${dare ? 'Pip is already counting. ' : 'Two Tallymen scouts. They have seen you. '}${target(m)} ${mv.n} to ${dare ? 'shut him up' : 'drive them off'}.</h2>
+      <h2>${dare ? 'Pip is already counting. ' : T.rescue ? 'Two guards on the gate. They have seen you. ' : 'Two Tallymen scouts. They have seen you. '}${target(m)} ${mv.n} to ${dare ? 'shut him up' : T.rescue ? 'break the guard' : 'drive them off'}.</h2>
       <div class="reps num" id="reps">${m.reps}</div>
       <p class="muted num" style="text-align:center" id="btime">${m.bt0 ? '' : 'The clock starts on your first rep. You have two minutes.'}</p>
       <button class="primary tap" id="rep">Tap for each rep</button>
       <div class="row"><button class="grow" id="swap">Different exercise</button><button class="quiet grow" id="fallback">Fall back</button></div>
-      <p class="small muted">Set the phone where you can reach it, or count out loud and tap them in after. Stop if anything hurts. Falling back still brings home half.</p>`;
+      <p class="small muted">Set the phone where you can reach it, or count out loud and tap them in after. Stop if anything hurts. ${T.rescue ? 'Falling back means going again another time.' : 'Falling back still brings home half.'}</p>`;
     $('rep').onclick = () => { if (!m.bt0) m.bt0 = Date.now(); m.reps++; $('reps').textContent = m.reps; if (m.reps >= target(m)) endBattle(true); else save(); };
     $('swap').onclick = () => { m.move = (m.move + 1) % MOVES.length; m.reps = 0; m.bt0 = 0; save(); render(); };
     $('fallback').onclick = () => endBattle(false);
@@ -900,7 +970,7 @@ function render(){
     const T = TASKS[m.id], out = m.phase === 'out';
     const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
     el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
-      <h2>${out ? 'Get to ' + place : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
+      <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
@@ -931,7 +1001,7 @@ function render(){
     el.innerHTML = `${pic('s-' + artFor(T), 'scene', 'The ' + SITE[T.res])}<div class="thead">${pic('p-' + T.g, 'face sm')}<div><p class="eyebrow">${PEOPLE[T.g].name} sends you</p><h2>${T.t}</h2></div></div>
       <p><b>${o.name ? esc(o.name) : o.onTrail ? 'A trail' : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${o.routeM ? 'About ' + fmtDist(o.routeM * 2) + ' there and back on foot.' : fmtDist(o.oneWay * 2) + ' there and back in a straight line, more by road.'}</p>
       ${radarBox(o.route ? 'Blue dots are the walking path from camp.' : practice ? 'Practice ground.' : 'The dashed line is the straight direction. The walking path appears here when it loads.')}
-      <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.onTrail ? 'This spot is on a mapped trail.' : o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
+      <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.onTrail ? 'This spot is on a mapped trail.' : o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} ${T.rescue ? '' : 'You can carry ' + carry() + ' back.'}</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">${o.known ? 'Scout a new ' + placeName(placeKey(T)) : 'Find another place'}</button></div>
       ${practice ? '' : fixBox(T)}
       <button class="quiet" id="back">Back to the board</button>`;
@@ -944,11 +1014,13 @@ function render(){
     const L = S.last; let h = '';
     if (L){
       const T = TASKS[L.id];
-      h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
+      h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.rescue ? (L.freed ? PEOPLE[L.freed].name + ' is home' : 'Driven off at the stockade') : T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
         <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p></div>`;
     }
-    const arc = S.fever && !S.fever.done && !S.fever.failed;
-    h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${arc ? 'Wren is burning up' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2><ul class="tasks">`;
+    const arc = S.fever && !S.fever.done && !S.fever.failed, tk = takenList(), CS = campState();
+    h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${tk.length ? 'The Tallymen have ' + names(tk) : arc ? 'Wren is burning up' : CS.mood === 'Marked' ? 'There is a mark on the hut door' : CS.mood === 'Watched' ? 'Scouts on the ridge' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2>
+      ${CS.warn || ['Watched', 'Marked', 'Raided'].includes(CS.mood) ? `<p class="small alarm">${CS.line} ${CS.warn || ''} Finishing any task keeps the Tallymen away.</p>` : ''}<ul class="tasks">`;
+    if (tk.length) h += taskRow('rescue', true);
     if (arc) h += taskRow('fever', true);
     S.board.ids.forEach(id => h += taskRow(id, false));
     h += '</ul>';
@@ -1056,16 +1128,21 @@ function drawRadar(){
 const talkIdx = {};
 function renderCamp(){
   const r = rankIdx(), next = RANKS[r + 1];
-  const n0 = needs(), base = RANKS[r][0];
+  const n0 = needs(), base = RANKS[r][0], CS = campState();
   $('hudDay').textContent = 'Day ' + (dayDiff(S.first, today()) + 1);
   $('hudRank').textContent = RANKS[r][1];
   $('hudCarry').textContent = 'Carry ' + carry();
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
   $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small></div>`).join('');
-  $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd>`;
+  $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
+  { const N = neglect();
+    $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with Maren\'s leave' : 'Tell Maren you need two rest days (' + N.rests + ' banked)'}</button>
+      <p class="small muted">The camp needs one finished task every other day. Miss more than that and the Tallymen notice: first scouts, then a mark on the door, then they take someone. Rest days do not count against you, and you earn another for every five tasks.</p>`;
+    $('restBtn').onclick = takeRest; }
   $('people').innerHTML = Object.entries(PEOPLE).map(([k, p]) => {
     const t = S.trust[k], tier = t >= 7 ? 2 : t >= 3 ? 1 : 0, line = p.lines[tier][(talkIdx[k] || 0) % 2], open = aiOn() && openTalk === k;
+    if (taken()[k]) return `<li class="gone"><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3></div><span class="small muted">${p.role}</span></div></div><span class="say">Taken by the Tallymen. ${p.name} is held in their stockade until you bring them back.</span></li>`;
     return `<li><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3><span class="pips" role="img" aria-label="Trust ${t} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</span></div>
       <span class="small muted">${p.role}</span></div></div>${open && (S.chat[k] || []).length ? '' : `<span class="say">"${line}"</span>`}
       ${open ? `<div class="chat">${(S.chat[k] || []).slice(-4).map(c => c.role === 'user' ? `<span class="me">You: ${esc(c.content)}</span>` : `<span class="say">${esc(c.content)}</span>`).join('')}${talkBusy ? '<span class="muted small">Thinking…</span>' : ''}${talkErr ? `<span class="small" style="color:var(--warn)">${talkErr}</span>` : ''}</div>
