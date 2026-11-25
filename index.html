@@ -395,7 +395,7 @@ const GMAPS_KEY = 'AIzaSyABeK9cERD8PMb_gALajr4ASzRW7Weap60';  // Google Maps Emb
 const PRIVACY = `<details class="lochelp priv"><summary>We do not track your location. Details</summary><ol>
   <li>There is no account and no game server. The people who made this game never receive where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
-  <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide, not your exact position.</li>
+  <li>To pick a destination, the game asks OpenStreetMap's public map service for parks and trails around a rounded point about half a mile (1 km) wide, not your exact position.</li>
   <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your home to the destination. Your exact home spot is not sent.</li>
   <li>The map in the game is drawn on your phone. If you tap the small map icon or "Open in Google Maps", Google receives where you are and the destination so it can draw the route. Nothing goes to Google unless you tap one of those.</li>
   
@@ -450,7 +450,7 @@ setInterval(() => {
 }, 4000);
 const gpsDiag = () => `Location check: permission ${gpsPerm || 'unknown'}, ${gpsFixes} readings, ${gpsPolls} tries${gpsWhy ? ', last result ' + gpsWhy : ', no answer from the phone yet'}.`;
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
-function crumb(m, fix){ (m.trail = m.trail || []).push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
+function crumb(m, fix){ if (!Array.isArray(m.trail)) m.trail = []; m.trail.push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
 function onFix(fix){
   pos = fix;
   if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 6000 && fix.acc <= 150))){
@@ -485,19 +485,30 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden){ new
 let tried = [], scouting = false;
 async function findPark(oneWay){
   if (practice) return null;
-  const q = `[out:json][timeout:12];nwr["leisure"~"^(park|pitch|recreation_ground|nature_reserve|common)$"]["access"!~"^(private|no)$"](around:${Math.round(oneWay * 1.6) + 900},${S.home.lat.toFixed(2)},${S.home.lng.toFixed(2)});out center tags 200;`;
+  // Parks and fields, plus named trails and trailheads. Trails are preferred when one is about the right distance.
+  const around = `(around:${Math.round(oneWay * 1.6) + 900},${S.home.lat.toFixed(2)},${S.home.lng.toFixed(2)})`, open = '["access"!~"^(private|no)$"]';
+  const q = `[out:json][timeout:12];nwr["leisure"~"^(park|pitch|recreation_ground|nature_reserve|common)$"]${open}${around};out center tags 150;` +
+    `(way["highway"~"^(path|footway|track|bridleway)$"]["name"]${open}["footway"!~"^(sidewalk|crossing)$"]${around};node["highway"="trailhead"]${around};);out geom tags 80;`;
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 14000);
   try {
     const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal});
     if (!r.ok) return null;
     const c = (await r.json()).elements.map(e => {
-      const p = e.center || e; if (p.lat == null) return null;
+      const tags = e.tags || {}, trail = !!tags.highway;
+      let p = null;
+      if (trail && e.geometry && e.geometry.length){
+        // the point along the trail whose distance from camp best matches the task
+        let best = Infinity; e.geometry.forEach(n => { if (!n) return; const dd = Math.abs(dist(S.home, {lat:n.lat, lng:n.lon}) - oneWay); if (dd < best){ best = dd; p = n; } });
+      } else p = e.center || e;
+      if (!p || p.lat == null) return null;
       const pt = {lat:p.lat, lng:p.lon};
-      return {pt, name:String((e.tags && e.tags.name) || '').slice(0, 60), d:dist(S.home, pt), key:p.lat.toFixed(4) + ',' + p.lon.toFixed(4)};
+      return {pt, trail, name:String(tags.name || '').slice(0, 60), d:dist(S.home, pt), key:p.lat.toFixed(4) + ',' + p.lon.toFixed(4)};
     }).filter(x => x && x.d >= oneWay * 0.5 && x.d <= oneWay * 1.6 && !tried.includes(x.key));
     if (!c.length) return null;
-    c.sort((a, b) => Math.abs(a.d - oneWay) - Math.abs(b.d - oneWay));
-    return c[Math.floor(Math.random() * Math.min(4, c.length))];
+    const score = x => Math.abs(x.d - oneWay) - (x.trail ? oneWay * 0.35 : 0);
+    c.sort((a, b) => score(a) - score(b));
+    const pool = c[0].trail ? c.filter(x => x.trail).slice(0, 3) : c.slice(0, 4);
+    return pool[Math.floor(Math.random() * pool.length)];
   } catch { return null; } finally { clearTimeout(to); }
 }
 // Walking route along real paths, from the public OpenStreetMap routing service. The start is rounded to about a
@@ -531,13 +542,13 @@ async function pickSite(oneWay){
   Object.values(places()).forEach(p => { const k = ptKey(p.site); if (!tried.includes(k)) tried.push(k); });
   avoid().forEach(k => { if (!tried.includes(k)) tried.push(k); });
   const park = await findPark(oneWay);
-  if (park){ tried.push(park.key); return {site:park.pt, oneWay:park.d, name:park.name, real:true}; }
+  if (park){ tried.push(park.key); return {site:park.pt, oneWay:park.d, name:park.name, real:true, onTrail:!!park.trail}; }
   const d = oneWay * (0.92 + Math.random() * 0.16);
   return {site:project(S.home, Math.random() * 360, d), oneWay:d, name:'', real:false};
 }
 async function scout(id, fresh){
   const T = TASKS[id], known = places()[placeKey(T)];
-  if (known && !fresh){ S.offer = {id, site:known.site, oneWay:known.oneWay, name:known.name, real:known.real, route:known.route || null, routeM:known.routeM || 0, known:true}; save(); render(); if (!known.route) addRoute(S.offer); return; }
+  if (known && !fresh){ S.offer = {id, site:known.site, oneWay:known.oneWay, name:known.name, real:known.real, onTrail:known.onTrail, route:known.route || null, routeM:known.routeM || 0, known:true}; save(); render(); if (!known.route) addRoute(S.offer); return; }
   scouting = true; render();
   const n = await pickSite(T.km * 500);
   scouting = false;
@@ -602,7 +613,7 @@ function wireFix(){
 }
 function startMission(){
   const o = S.offer; if (!o) return;
-  S.mission = {id:o.id, site:o.site, oneWay:o.oneWay, name:o.name, real:o.real, route:o.route || null, routeM:o.routeM || 0, phase:'out', t0:Date.now(), meters:0, ride:0, lastFix:null, won:null, reps:0, move:Math.floor(Math.random() * MOVES.length), bt0:0};
+  S.mission = {id:o.id, site:o.site, oneWay:o.oneWay, name:o.name, real:o.real, onTrail:o.onTrail, route:o.route || null, routeM:o.routeM || 0, phase:'out', t0:Date.now(), meters:0, ride:0, lastFix:null, won:null, reps:0, move:Math.floor(Math.random() * MOVES.length), bt0:0};
   S.offer = null; S.last = null; tried = []; fixSay = ''; fixOpen = false; save();
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
@@ -612,7 +623,7 @@ function arrive(){
   const m = S.mission; buzz();
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
   if (!had || ptKey(had.site) !== ptKey(m.site)){
-    places()[pk] = {site:m.site, oneWay:m.oneWay, name:m.name, real:!!m.real, route:m.route || null, routeM:m.routeM || 0, found:today()};
+    places()[pk] = {site:m.site, oneWay:m.oneWay, name:m.name, real:!!m.real, onTrail:!!m.onTrail, route:m.route || null, routeM:m.routeM || 0, found:today()};
     note('You found the ' + placeName(pk) + (m.name ? ' at ' + m.name : '') + '. It is on your map now, and it will be there next time.');
   }
   if (TASKS[m.id].battle){ m.phase = 'battle'; m.reps = 0; m.bt0 = 0; }
@@ -918,9 +929,9 @@ function render(){
   } else if (S.offer){
     const o = S.offer, T = TASKS[o.id];
     el.innerHTML = `${pic('s-' + artFor(T), 'scene', 'The ' + SITE[T.res])}<div class="thead">${pic('p-' + T.g, 'face sm')}<div><p class="eyebrow">${PEOPLE[T.g].name} sends you</p><h2>${T.t}</h2></div></div>
-      <p><b>${o.name ? esc(o.name) : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${o.routeM ? 'About ' + fmtDist(o.routeM * 2) + ' there and back on foot.' : fmtDist(o.oneWay * 2) + ' there and back in a straight line, more by road.'}</p>
+      <p><b>${o.name ? esc(o.name) : o.onTrail ? 'A trail' : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${o.routeM ? 'About ' + fmtDist(o.routeM * 2) + ' there and back on foot.' : fmtDist(o.oneWay * 2) + ' there and back in a straight line, more by road.'}</p>
       ${radarBox(o.route ? 'Blue dots are the walking path from camp.' : practice ? 'Practice ground.' : 'The dashed line is the straight direction. The walking path appears here when it loads.')}
-      <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
+      <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.onTrail ? 'This spot is on a mapped trail.' : o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">${o.known ? 'Scout a new ' + placeName(placeKey(T)) : 'Find another place'}</button></div>
       ${practice ? '' : fixBox(T)}
       <button class="quiet" id="back">Back to the board</button>`;
@@ -1016,7 +1027,7 @@ function drawRadar(){
   const mid = {lat:(S.home.lat + m.site.lat) / 2, lng:(S.home.lng + m.site.lng) / 2};
   const xy = p => ({x:(p.lng - mid.lng) * 111320 * Math.cos(rad(mid.lat)), y:(p.lat - mid.lat) * 110540});
   const pts = [xy(S.home), xy(m.site)]; if (pos) pts.push(xy(pos));
-  const trail = (m.trail || []).map(t => xy({lat:t[0], lng:t[1]})), route = (m.route || []).map(t => xy({lat:t[0], lng:t[1]}));
+  const trail = (Array.isArray(m.trail) ? m.trail : []).map(t => xy({lat:t[0], lng:t[1]})), route = (m.route || []).map(t => xy({lat:t[0], lng:t[1]}));
   const ext = Math.max(40, ...pts.concat(trail, route).map(p => Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
   const k = (h / 2 - 28) / ext, P = p => ({x:w / 2 + p.x * k, y:h / 2 - p.y * k});
   const H = P(pts[0]), T = P(pts[1]);
