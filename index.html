@@ -113,6 +113,7 @@ a{color:var(--water)}
 html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
 .maprow{display:flex;align-items:center;gap:10px;margin:.4rem 0}.maprow p{margin:0}.mapicon{flex:none;width:44px;height:44px;min-height:0;padding:0;display:grid;place-items:center;background:var(--raised);border:2px solid var(--line);border-radius:4px}.mapicon svg{width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round}.mapicon[aria-pressed=true]{border-color:var(--ember)}.mapicon[aria-pressed=true] svg{stroke:var(--ember)}
 #world{height:260px}
+.fixbox{margin:.5rem 0}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:.5rem 0 .75rem}.chips button{min-height:40px;padding:.3rem .7rem;font-size:.9375rem}.fixbox input{width:100%;box-sizing:border-box;margin:.25rem 0 .6rem;min-height:44px;padding:.55rem .7rem;font:400 1rem Barlow,system-ui,sans-serif;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:4px}.fixbox input::placeholder{color:var(--muted);opacity:.7}
 </style>
 
 <div class="app">
@@ -515,7 +516,7 @@ async function fetchRoute(a, b){
 async function addRoute(o){
   if (practice || !o) return;
   const rt = await fetchRoute(S.home, o.site);
-  if (!rt || S.offer !== o) return;
+  if (!rt || (S.offer !== o && S.mission !== o)) return;
   o.route = rt.pts; o.routeM = rt.m; save(); render();
 }
 // Places stay where you found them: once you have reached a spot it is saved under its kind (spring, grove, far grove...)
@@ -526,23 +527,83 @@ const placeName = k => (k.endsWith('-far') ? 'far ' : '') + SITE[k.replace('-far
 const PLACE_TINT = {...TINT, feverbark:'#FF6B6B', 'wood-far':'#E0703A', 'food-far':'#2FB8A0', 'water-far':'#4F8FE8', 'stone-far':'#7C8FA6', 'fiber-far':'#B8A030', 'herbs-far':'#9A6BD8'};
 const placeColor = k => PLACE_TINT[k] || PLACE_TINT[k.replace('-far', '')] || '#FF8A4C';
 const ptKey = p => p.lat.toFixed(4) + ',' + p.lng.toFixed(4);
-async function scout(id, fresh){
-  const T = TASKS[id], oneWay = T.km * 500, known = places()[placeKey(T)];
-  if (known && !fresh){ S.offer = {id, site:known.site, oneWay:known.oneWay, name:known.name, real:known.real, route:known.route || null, routeM:known.routeM || 0, known:true}; save(); render(); if (!known.route) addRoute(S.offer); return; }
+async function pickSite(oneWay){
   Object.values(places()).forEach(p => { const k = ptKey(p.site); if (!tried.includes(k)) tried.push(k); });
-  scouting = true; render();
+  avoid().forEach(k => { if (!tried.includes(k)) tried.push(k); });
   const park = await findPark(oneWay);
+  if (park){ tried.push(park.key); return {site:park.pt, oneWay:park.d, name:park.name, real:true}; }
+  const d = oneWay * (0.92 + Math.random() * 0.16);
+  return {site:project(S.home, Math.random() * 360, d), oneWay:d, name:'', real:false};
+}
+async function scout(id, fresh){
+  const T = TASKS[id], known = places()[placeKey(T)];
+  if (known && !fresh){ S.offer = {id, site:known.site, oneWay:known.oneWay, name:known.name, real:known.real, route:known.route || null, routeM:known.routeM || 0, known:true}; save(); render(); if (!known.route) addRoute(S.offer); return; }
+  scouting = true; render();
+  const n = await pickSite(T.km * 500);
   scouting = false;
-  if (park){ tried.push(park.key); S.offer = {id, site:park.pt, oneWay:park.d, name:park.name, real:true}; }
-  else { const d = oneWay * (0.92 + Math.random() * 0.16); S.offer = {id, site:project(S.home, Math.random() * 360, d), oneWay:d, name:'', real:false}; }
+  S.offer = {id, ...n};
   save(); render(); addRoute(S.offer);
 }
+/* ---------- telling the camp a place is no good ---------- */
+// The player says what is wrong in their own words. With villager voices on, the task giver (AI) picks one of four
+// fixed actions and answers in character; without AI, plain keywords pick it. The game does the moving either way.
+let fixOpen = false, fixBusy = false, fixSay = '';
+const avoid = () => S.avoid || (S.avoid = []);
+const FIX_LINES = {closer:'Closer, then. Do not make a habit of asking.', farther:'You want a longer road? Fine. Take it.', replace:'Then not there. There is other ground.', keep:'It stays where it is. Go.'};
+function guessFix(text){
+  const t = text.toLowerCase();
+  if (/too far|far away|closer|shorter|nearer|tired|long way|not that far|can.?t walk that/.test(t)) return 'closer';
+  if (/too close|too short|too easy|farther|further|longer/.test(t)) return 'farther';
+  return 'replace';
+}
+async function fixPlace(text, forced){
+  const m = S.mission && S.mission.phase === 'out' ? S.mission : null, cur = m || S.offer; if (!cur || fixBusy) return;
+  const T = TASKS[cur.id], pk = placeKey(T);
+  fixBusy = true; fixSay = ''; render();
+  let action = forced || guessFix(text), say = '';
+  if (!forced && text && aiOn()){
+    try {
+      const j = await askAI(charRules(T.g) + `
 
-/* ---------- missions ---------- */
+The Stranger now says there is a problem with the place you sent them: the ${placeName(pk)}, about ${Math.round(cur.oneWay)} metres from camp. Decide what to do and reply ONLY with JSON: {"action": "closer" | "farther" | "replace" | "keep", "reply": "one or two short sentences in your voice"}. Use "replace" when the place is private, fenced, closed, unsafe or cannot be reached. Use "closer" when it is too far for them. Use "farther" when they ask for a longer walk. Use "keep" only when they describe no real problem with the place. You cannot change anything else.`, [{role:'user', content:text.slice(0, 300)}], true);
+      if (j && FIX_LINES[j.action]) action = j.action;
+      say = String((j && j.reply) || '').trim().slice(0, 300);
+    } catch (e){ say = ''; }
+  }
+  let n = null;
+  if (action !== 'keep'){
+    avoid().push(ptKey(cur.site)); S.avoid = avoid().slice(-60);
+    const had = places()[pk]; if (had && ptKey(had.site) === ptKey(cur.site)) delete places()[pk];
+    n = await pickSite(Math.max(150, Math.min(4000, cur.oneWay * (action === 'closer' ? 0.6 : action === 'farther' ? 1.4 : 1))));
+    if (m && S.mission === m) Object.assign(m, n, {route:null, routeM:0});
+    else if (S.offer === cur) S.offer = {id:cur.id, ...n};
+    note('You told ' + PEOPLE[T.g].name + ' the ' + placeName(pk) + ' was no good' + (text ? ' ("' + text.slice(0, 80) + '")' : '') + '. You were sent to new ground.');
+  }
+  fixSay = say || FIX_LINES[action]; fixBusy = false; fixOpen = false; save(); render();
+  if (n) addRoute(S.mission && S.mission.phase === 'out' && m ? S.mission : S.offer);
+}
+function fixBox(T){
+  const who = PEOPLE[T.g].name;
+  if (fixBusy) return `<p class="small muted">${who} is thinking it over…</p>`;
+  const said = fixSay ? `<p class="small"><b>${who}:</b> <span class="say">"${esc(fixSay)}"</span></p>` : '';
+  if (!fixOpen) return said + '<button class="quiet" id="fixOpen">Problem with this place?</button>';
+  return `${said}<div class="panel fixbox"><h3>Tell ${who} what is wrong</h3>
+    <div class="chips"><button data-fix="replace" data-why="It is private or fenced off">Private or fenced</button><button data-fix="replace" data-why="I cannot get there">Can't get there</button><button data-fix="replace" data-why="It is not safe">Not safe</button><button data-fix="closer" data-why="It is too far">Too far</button><button data-fix="farther" data-why="It is too close">Too close</button></div>
+    <label class="small muted" for="fixText">Or say it in your own words</label>
+    <input id="fixText" maxlength="300" placeholder="There is a locked gate across the path" autocomplete="off">
+    <div class="row"><button class="primary grow" id="fixSend">Tell ${who}</button><button class="quiet" id="fixCancel">Never mind</button></div>
+    <p class="small muted">${aiOn() ? who + ' will answer and send you somewhere else.' : 'You will be sent somewhere else. Bad spots are not offered again.'}</p></div>`;
+}
+function wireFix(){
+  if ($('fixOpen')) $('fixOpen').onclick = () => { fixOpen = true; render(); };
+  if ($('fixCancel')) $('fixCancel').onclick = () => { fixOpen = false; render(); };
+  document.querySelectorAll('[data-fix]').forEach(b => b.onclick = () => fixPlace(b.dataset.why, b.dataset.fix));
+  if ($('fixSend')) $('fixSend').onclick = () => { const t = $('fixText').value.trim(); if (t) fixPlace(t); else $('fixText').focus(); };
+}
 function startMission(){
   const o = S.offer; if (!o) return;
   S.mission = {id:o.id, site:o.site, oneWay:o.oneWay, name:o.name, real:o.real, route:o.route || null, routeM:o.routeM || 0, phase:'out', t0:Date.now(), meters:0, ride:0, lastFix:null, won:null, reps:0, move:Math.floor(Math.random() * MOVES.length), bt0:0};
-  S.offer = null; S.last = null; tried = []; save();
+  S.offer = null; S.last = null; tried = []; fixSay = ''; fixOpen = false; save();
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
 }
@@ -838,9 +899,11 @@ function render(){
         ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Open in Google Maps</a>'}
         <button class="quiet" id="abandon">Turn back</button>
       </div>
+      ${practice || !out ? '' : fixBox(T)}
       <p class="small muted" id="gpsLine"></p>
       ${practice ? '' : '<button class="primary" id="gpsRetry" hidden>Tap to find my location</button><p class="small muted" id="gpsDiag"></p>'}`;
     wireGmap(pos || (out ? S.home : m.site), out ? m.site : S.home);
+    wireFix();
     if ($('gpsRetry')) $('gpsRetry').onclick = () => { lastKick = Date.now(); restartGPS(); gpsPoll(true); $('gpsRetry').hidden = true; };
     abandonArmed = false;
     $('abandon').onclick = () => {
@@ -859,7 +922,9 @@ function render(){
       ${radarBox(o.route ? 'Blue dots are the walking path from camp.' : practice ? 'Practice ground.' : 'The dashed line is the straight direction. The walking path appears here when it loads.')}
       <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">${o.known ? 'Scout a new ' + placeName(placeKey(T)) : 'Find another place'}</button></div>
+      ${practice ? '' : fixBox(T)}
       <button class="quiet" id="back">Back to the board</button>`;
+    wireFix();
     requestAnimationFrame(drawRadar); wireGmap(S.home, o.site);
     $('go').onclick = () => { startMission(); if (needsCompassTap()) startCompass(); };
     $('again').onclick = () => scout(o.id, true);
