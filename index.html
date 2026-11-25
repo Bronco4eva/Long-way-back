@@ -388,8 +388,8 @@ const PRIVACY = `<details class="lochelp priv"><summary>We do not track your loc
   <li>There is no account and no game server. The people who made this game never receive where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
   <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide, not your exact position.</li>
-  ${GMAPS_KEY ? '<li>The route map on a task is drawn by Google Maps. To draw it, Google receives your home spot and the destination each time you look at a task.</li>' : '<li>The street map of a destination is loaded from OpenStreetMap as map squares covering the neighborhood, so that service can tell which neighborhood is being looked at, but not the spot inside it.</li>'}
-  <li>If you tap the walking directions link, Google Maps opens with the destination. ${GMAPS_KEY ? '' : 'That is the only time a precise place leaves the game, and only when you tap it.'}</li>
+  <li>The map in the game is drawn on your phone and sends nothing. If you tap "Check the route on Google Maps" or "Open in Google Maps", Google receives where you are and the destination so it can draw the route. Nothing goes to Google unless you tap one of those.</li>
+  
   <li>The villager AI voices never receive your location, your parks or your home.</li>
   <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
 function locHelp(open){
@@ -441,6 +441,7 @@ setInterval(() => {
 }, 4000);
 const gpsDiag = () => `Location check: permission ${gpsPerm || 'unknown'}, ${gpsFixes} readings, ${gpsPolls} tries${gpsWhy ? ', last result ' + gpsWhy : ', no answer from the phone yet'}.`;
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
+function crumb(m, fix){ (m.trail = m.trail || []).push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
 function onFix(fix){
   pos = fix;
   if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 6000 && fix.acc <= 150))){
@@ -451,10 +452,10 @@ function onFix(fix){
     if (!m.lastFix) m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
     else {
       const d = dist(m.lastFix, fix), dt = (fix.t - m.lastFix.t) / 1000;
-      if (fix.sim){ m.meters += d; m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; }
+      if (fix.sim){ m.meters += d; m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; crumb(m, fix); }
       else if (d >= Math.max(10, fix.acc * 0.6)){
         if (dt > 0 && d / dt <= MAX_WALK_SPEED) m.meters += d; else m.ride += d;
-        m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
+        m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; crumb(m, fix);
       }
     }
     const target = m.phase === 'out' ? m.site : S.home;
@@ -666,6 +667,11 @@ const INTRO = [
    html:'<p>They give you a blanket, a bowl, and a place at the fire, on the far side from everyone else. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
 ];
 const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
+const gmapToggle = () => practice || !GMAPS_KEY ? '' : '<button class="quiet" id="gmapBtn">Check the route on Google Maps</button><div id="gmapSlot"></div>';
+function wireGmap(a, b){
+  const btn = $('gmapBtn'); if (!btn) return;
+  btn.onclick = () => { const slot = $('gmapSlot'); if (slot.innerHTML){ slot.innerHTML = ''; btn.textContent = 'Check the route on Google Maps'; } else { slot.innerHTML = realMap(a, b); btn.textContent = 'Hide the Google map'; } };
+}
 function realMap(a, b){
   if (GMAPS_KEY) return `<div class="rmap g"><iframe title="Google map of the walking route from camp to the destination" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen src="https://www.google.com/maps/embed/v1/directions?key=${GMAPS_KEY}&origin=${a.lat.toFixed(6)},${a.lng.toFixed(6)}&destination=${b.lat.toFixed(6)},${b.lng.toFixed(6)}&mode=walking"></iframe></div>`;
   const W = 640, H = 360, px = (p, z) => { const n = 256 * 2 ** z, r = p.lat * Math.PI / 180; return {x:(p.lng + 180) / 360 * n, y:(1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n}; };
@@ -783,13 +789,16 @@ function render(){
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
       <canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
+      <p class="small muted">The dashed line is the straight path. The blue dot is you, and it leaves a trail as you walk.</p>
       <div class="stats"><div><b id="sWalk">0</b><span class="small muted">on foot</span></div><div><b id="sTime">0:00</b><span class="small muted">time</span></div><div><b id="sSteps">0</b><span class="small muted">steps (est.)</span></div></div>
       <div class="row">
-        ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Walking directions</a>'}
+        ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Open in Google Maps</a>'}
         <button class="quiet" id="abandon">Turn back</button>
       </div>
       <p class="small muted" id="gpsLine"></p>
+      ${gmapToggle()}
       ${practice ? '' : '<button class="primary" id="gpsRetry" hidden>Tap to find my location</button><p class="small muted" id="gpsDiag"></p>'}`;
+    wireGmap(pos || (out ? S.home : m.site), out ? m.site : S.home);
     if ($('gpsRetry')) $('gpsRetry').onclick = () => { lastKick = Date.now(); restartGPS(); gpsPoll(true); $('gpsRetry').hidden = true; };
     abandonArmed = false;
     $('abandon').onclick = () => {
@@ -805,10 +814,12 @@ function render(){
     const o = S.offer, T = TASKS[o.id];
     el.innerHTML = `${pic('s-' + artFor(T), 'scene', 'The ' + SITE[T.res])}<div class="thead">${pic('p-' + T.g, 'face sm')}<div><p class="eyebrow">${PEOPLE[T.g].name} sends you</p><h2>${T.t}</h2></div></div>
       <p><b>${o.name ? esc(o.name) : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${fmtDist(o.oneWay * 2)} there and back in a straight line, more by road.</p>
-      ${practice ? '' : realMap(S.home, o.site)}
+      <canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
+      ${gmapToggle()}
       <p class="small muted">${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">Find another place</button></div>
       <button class="quiet" id="back">Back to the board</button>`;
+    requestAnimationFrame(drawRadar); wireGmap(S.home, o.site);
     $('go').onclick = () => { startMission(); if (needsCompassTap()) startCompass(); };
     $('again').onclick = () => scout(o.id);
     $('back').onclick = () => { S.offer = null; tried = []; save(); render(); };
@@ -865,7 +876,7 @@ function tick(){
   drawRadar();
 }
 function drawRadar(){
-  const c = $('radar'), m = S.mission; if (!c || !m) return;
+  const c = $('radar'), m = S.mission || S.offer; if (!c || !m) return;
   const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
   if (!w) return;
   if (c.width !== Math.round(w * dpr)){ c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
@@ -874,7 +885,8 @@ function drawRadar(){
   const mid = {lat:(S.home.lat + m.site.lat) / 2, lng:(S.home.lng + m.site.lng) / 2};
   const xy = p => ({x:(p.lng - mid.lng) * 111320 * Math.cos(rad(mid.lat)), y:(p.lat - mid.lat) * 110540});
   const pts = [xy(S.home), xy(m.site)]; if (pos) pts.push(xy(pos));
-  const ext = Math.max(40, ...pts.map(p => Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
+  const trail = (m.trail || []).map(t => xy({lat:t[0], lng:t[1]}));
+  const ext = Math.max(40, ...pts.concat(trail).map(p => Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
   const k = (h / 2 - 28) / ext, P = p => ({x:w / 2 + p.x * k, y:h / 2 - p.y * k});
   const H = P(pts[0]), T = P(pts[1]);
   g.strokeStyle = col('--line'); g.lineWidth = 1;
@@ -884,6 +896,7 @@ function drawRadar(){
   g.fillStyle = col('--ink'); g.fillRect(H.x - 7, H.y - 7, 14, 14); g.fillText('CAMP', H.x, H.y + (H.y > h / 2 ? 22 : -12));
   g.fillStyle = col('--ember'); g.beginPath(); g.moveTo(T.x, T.y - 9); g.lineTo(T.x + 9, T.y); g.lineTo(T.x, T.y + 9); g.lineTo(T.x - 9, T.y); g.fill();
   g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase(), T.x, T.y + (T.y > h / 2 ? 24 : -14));
+  g.fillStyle = col('--water'); trail.forEach(t => { const q = P(t); g.fillRect(q.x - 2, q.y - 2, 4, 4); });
   if (pos){
     const U = P(pts[2]);
     g.fillStyle = col('--water'); g.globalAlpha = .2; g.beginPath(); g.arc(U.x, U.y, Math.max(10, Math.min(60, pos.acc * k)), 0, 7); g.fill(); g.globalAlpha = 1;
