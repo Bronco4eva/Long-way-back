@@ -105,6 +105,11 @@ a{color:var(--water)}
 .rmap .pin::after{content:"";position:absolute;left:50%;bottom:-11px;width:10px;height:10px;margin-left:-7px;border-radius:50%;border:2px solid #14110F;background:inherit}
 .rmap .pin.home{background:#fff;color:#14110F}.rmap .pin.dest{background:var(--ember);color:var(--on-ember)}
 .rmap-credit{position:absolute;right:0;bottom:0;padding:1px 6px;font-size:.6875rem;background:rgba(255,255,255,.85);color:#1F2937}
+.cmprow{display:flex;align-items:center;gap:12px}.cmp{position:relative;flex:none;width:92px;height:92px;border:2px solid var(--line);border-radius:50%;background:var(--raised)}
+.cmp svg{position:absolute;inset:14px;transition:transform .15s linear;opacity:.25}.cmp path{fill:var(--muted)}.cmp.live svg{opacity:1}.cmp.live path{fill:var(--water)}.cmp.on{border-color:var(--moss)}.cmp.on path{fill:var(--moss)}
+.cmp-n{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;font:600 .6875rem/14px Barlow,system-ui,sans-serif;text-align:center;color:var(--muted);font-style:normal;transform:translateY(-34px);opacity:0}.cmp.live .cmp-n{opacity:1}
+#cmpLine{margin:.35rem 0;color:var(--muted);min-height:1.3em}#cmpBtn{margin-bottom:.5rem}
+.rmap.g{aspect-ratio:4/3;background:var(--raised)}.rmap.g iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 </style>
 
 <div class="app">
@@ -377,12 +382,13 @@ const LOCHELP = {
     'A computer only knows roughly where it is. The game is meant to be played on a phone you carry.']]
 };
 const platform = () => { const u = navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1) ? (/CriOS/.test(u) ? 'ioschrome' : 'ios') : /Android/.test(u) ? 'android' : 'desktop'; };
+const GMAPS_KEY = '';  // Google Maps Embed API key, locked to this site's address. Empty = OpenStreetMap picture.
 const PRIVACY = `<details class="lochelp priv"><summary>We do not track your location. Details</summary><ol>
-  <li>There is no account and no game server. Nobody running this game ever receives where you are or where you live.</li>
+  <li>There is no account and no game server. The people who made this game never receive where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
-  <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide. Your exact position is never sent.</li>
-  <li>The street map of a destination is loaded from OpenStreetMap as map squares covering the neighborhood, so that service can tell which neighborhood is being looked at, but not the spot inside it.</li>
-  <li>If you tap the walking directions link, Google Maps opens with the destination. That is the only time a precise place leaves the game, and only when you tap it.</li>
+  <li>To pick a park, the game asks OpenStreetMap's public map service for parks around a rounded point about half a mile (1 km) wide, not your exact position.</li>
+  ${GMAPS_KEY ? '<li>The route map on a task is drawn by Google Maps. To draw it, Google receives your home spot and the destination each time you look at a task.</li>' : '<li>The street map of a destination is loaded from OpenStreetMap as map squares covering the neighborhood, so that service can tell which neighborhood is being looked at, but not the spot inside it.</li>'}
+  <li>If you tap the walking directions link, Google Maps opens with the destination. ${GMAPS_KEY ? '' : 'That is the only time a precise place leaves the game, and only when you tap it.'}</li>
   <li>The villager AI voices never receive your location, your parks or your home.</li>
   <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
 function locHelp(open){
@@ -636,6 +642,7 @@ const INTRO = [
 ];
 const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
 function realMap(a, b){
+  if (GMAPS_KEY) return `<div class="rmap g"><iframe title="Google map of the walking route from camp to the destination" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen src="https://www.google.com/maps/embed/v1/directions?key=${GMAPS_KEY}&origin=${a.lat.toFixed(6)},${a.lng.toFixed(6)}&destination=${b.lat.toFixed(6)},${b.lng.toFixed(6)}&mode=walking"></iframe></div>`;
   const W = 640, H = 360, px = (p, z) => { const n = 256 * 2 ** z, r = p.lat * Math.PI / 180; return {x:(p.lng + 180) / 360 * n, y:(1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n}; };
   let z = 16; for (; z > 11; z--){ const A = px(a, z), B = px(b, z); if (Math.abs(A.x - B.x) < 190 && Math.abs(A.y - B.y) < 110) break; }
   const A = px(a, z), B = px(b, z), ox = Math.round((A.x + B.x) / 2 - W / 2), oy = Math.round((A.y + B.y) / 2 - H / 2), n = 2 ** z;
@@ -647,6 +654,44 @@ function realMap(a, b){
     <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/></svg>
     <span class="pin home" style="left:${ax}px;top:${ay}px">Camp</span><span class="pin dest" style="left:${bx}px;top:${by}px">Go here</span></div>
     <a class="rmap-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a></div>`;
+}
+/* ---------- compass: arrow that turns with the phone ---------- */
+let compassRefused = false, heading = null, compassOn = false, compassNote = '', arrowDeg = 0, northDeg = 0, compassSince = 0;
+function onOrient(e){
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading;
+  else if (e.absolute && e.alpha != null) h = 360 - e.alpha;
+  if (h == null) return;
+  h += (screen.orientation && screen.orientation.angle) || 0;
+  heading = ((h % 360) + 360) % 360; updateCompass();
+}
+const needsCompassTap = () => typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+async function startCompass(){
+  if (compassOn || practice) return;
+  if (typeof DeviceOrientationEvent === 'undefined'){ compassNote = 'This browser has no compass.'; updateCompass(); return; }
+  try {
+    if (needsCompassTap()){ try { compassRefused = await DeviceOrientationEvent.requestPermission() !== 'granted'; } catch { compassRefused = true; } }
+    addEventListener('deviceorientationabsolute', onOrient); addEventListener('deviceorientation', onOrient);
+    compassOn = true; compassSince = Date.now(); compassNote = ''; updateCompass();
+    setTimeout(updateCompass, 3200);
+  } catch { compassNote = 'The compass could not be started on this phone.'; updateCompass(); }
+}
+const spin = (cur, to) => cur + ((((to - cur) % 360) + 540) % 360 - 180);
+function updateCompass(){
+  const box = $('cmp'), line = $('cmpLine'), btn = $('cmpBtn'), m = S.mission; if (!box || !m) return;
+  btn.hidden = compassOn || !needsCompassTap() || !!compassNote;
+  if (heading == null || !pos){
+    box.classList.remove('live');
+    line.textContent = compassNote || (!compassOn ? (needsCompassTap() ? 'Tap the button and the arrow will point the way as you turn.' : '') : heading == null ? (Date.now() - compassSince > 3000 ? (compassRefused ? 'Compass access was refused. Close this tab and open the game again to be asked once more.' : 'No compass reading from this phone. Use the map sketch below.') : 'Starting the compass…') : 'Waiting for GPS.');
+    return;
+  }
+  const tg = m.phase === 'out' ? m.site : S.home, rel = ((bearing(pos, tg) - heading) % 360 + 360) % 360;
+  arrowDeg = spin(arrowDeg, rel); northDeg = spin(northDeg, -heading);
+  box.classList.add('live');
+  $('cmpArrow').style.transform = `rotate(${arrowDeg}deg)`; box.querySelector('.cmp-n').style.transform = `rotate(${northDeg}deg) translateY(-34px)`;
+  const on = rel < 20 || rel > 340;
+  box.classList.toggle('on', on);
+  line.textContent = on ? 'That is the way. Walk where the arrow points.' : rel < 160 ? 'Turn right until the arrow points straight up.' : rel > 200 ? 'Turn left until the arrow points straight up.' : 'It is behind you. Turn around.';
 }
 function taskRow(id, arc){
   const T = TASKS[id], done = S.board.done[id];
@@ -709,7 +754,9 @@ function render(){
     const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
     el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
-      <div><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
+      <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
+        ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
+      ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
       <canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
       <div class="stats"><div><b id="sWalk">0</b><span class="small muted">on foot</span></div><div><b id="sTime">0:00</b><span class="small muted">time</span></div><div><b id="sSteps">0</b><span class="small muted">steps (est.)</span></div></div>
       <div class="row">
@@ -723,6 +770,7 @@ function render(){
       S.mission = null; save(); render();
     };
     if (practice) $('simWalk').onclick = simWalk;
+    else { $('cmpBtn').onclick = startCompass; if (!needsCompassTap()) startCompass(); updateCompass(); }
     tick();
   } else if (scouting){
     el.innerHTML = `<p class="eyebrow">Scouting</p><h2>Working out where to send you…</h2><p class="muted">Looking for parks and open ground near camp.</p>`;
@@ -734,7 +782,7 @@ function render(){
       <p class="small muted">${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">Find another place</button></div>
       <button class="quiet" id="back">Back to the board</button>`;
-    $('go').onclick = startMission;
+    $('go').onclick = () => { startMission(); if (needsCompassTap()) startCompass(); };
     $('again').onclick = () => scout(o.id);
     $('back').onclick = () => { S.offer = null; tried = []; save(); render(); };
   } else {
@@ -771,6 +819,7 @@ function tick(){
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
   } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Waiting for GPS.'; }
+  updateCompass();
   $('sWalk').textContent = fmtDist(m.meters);
   $('sTime').textContent = fmtTime(Date.now() - m.t0);
   $('sSteps').textContent = Math.round(m.meters / 0.78).toLocaleString();
