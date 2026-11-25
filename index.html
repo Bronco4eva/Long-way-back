@@ -1,0 +1,854 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>The Long Way Back</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Jersey+15&family=VT323&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+/* Layout: a handheld game. Stats bar pinned on top, one screen at a time in the middle, five screen tabs along the bottom.
+   One deliberate look: night at the camp, lit by the fire. */
+:root{
+  --bg:#0D1215; --surface:#161D23; --raised:#1F2931; --ink:#E4E9EC; --muted:#93A0AA; --line:#2D3943;
+  --ember:#FF8A4C; --on-ember:#1C0E05; --moss:#6FC694; --water:#66BDD8; --warn:#E2B04C;
+  --display:"Jersey 15","VT323","Courier New",monospace;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --story:"Source Serif 4",Georgia,"Times New Roman",serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--surface)}
+.app{max-width:30rem;margin:0 auto;padding-block:0 6.5rem;display:flex;flex-direction:column;gap:1.25rem}
+.gut{padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.screen{display:flex;flex-direction:column;gap:1.5rem}
+h1,h2,h3,.big,.count,.reps{font-family:var(--display);font-weight:400;line-height:1.05;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:2.25rem}
+h2{font-size:1.875rem} h3{font-size:1.5rem}
+p{margin:0}
+.eyebrow{font:400 1.0625rem var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)} .small{font-size:.875rem} .num{font-variant-numeric:tabular-nums}
+.story{font-family:var(--story);font-size:1.0625rem;line-height:1.6;display:flex;flex-direction:column;gap:.8rem}
+.say{font-family:var(--story);font-style:italic}
+/* stats bar */
+.hud{position:sticky;top:env(safe-area-inset-top, 0px);z-index:9;background:var(--surface);border-bottom:2px solid var(--line);padding-block:.5rem .55rem;display:flex;flex-direction:column;gap:.4rem}
+.hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;font:400 1.375rem/1 var(--display)}
+.hud-top span:last-child{color:var(--ember)}
+.hud-bar{height:6px;background:var(--line);border-radius:1px;overflow:hidden}
+.hud-bar i{display:block;height:100%;background:var(--moss);width:0}
+.hud-stores{display:grid;grid-template-columns:repeat(6,1fr);gap:.25rem}
+.hud-stores div{display:flex;flex-direction:column;align-items:flex-start;font:400 1.5rem/1.1 var(--display);font-variant-numeric:tabular-nums;border-top:3px solid var(--c);padding-top:.15rem}
+.hud-stores div.low{color:var(--ember)}
+.hud-stores small{font:500 .6875rem var(--body);color:var(--muted);white-space:nowrap}
+/* screen tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom, 0px)}
+.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:56px;padding:.3rem .1rem;font:400 1.25rem var(--display);color:var(--muted);margin-top:-2px}
+.tabs button[aria-current="true"]{color:var(--ember);border-top-color:var(--ember)}
+.banner{background:var(--surface);border:1px dashed var(--warn);padding:.6rem .75rem;border-radius:4px;font-size:.875rem;display:flex;gap:.75rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.panel{background:var(--surface);border:2px solid var(--line);border-radius:4px;padding:1rem;display:flex;flex-direction:column;gap:.9rem}
+.scene{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:2px solid var(--line);border-radius:4px;background:var(--raised)}
+.scene.strip{aspect-ratio:3/1}
+.face{width:72px;height:72px;flex:none;border:2px solid var(--line);border-radius:4px;object-fit:cover;background:var(--raised)}
+.face.sm{width:44px;height:44px}
+.big{font-size:4.25rem;color:var(--ember)}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.row > *{min-width:0} .grow{flex:1 1 auto}
+button,.linkbtn{font:600 1rem var(--body);min-height:48px;padding:.6rem 1rem;border-radius:4px;border:2px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+button.primary{background:var(--ember);border-color:var(--ember);color:var(--on-ember)}
+button.quiet{border-color:var(--line);color:var(--muted);font-weight:500;min-height:44px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,.linkbtn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tasks li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.45rem}
+.tasks li.arc{border-top:3px solid var(--ember)}
+.thead{display:flex;gap:.7rem;align-items:center}
+.thead > div{min-width:0;flex:1}
+.tag{display:inline-block;font:400 1rem/1.2 var(--display);letter-spacing:.04em;padding:.1rem .45rem;border-radius:2px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.fight{border-color:var(--ember);color:var(--ember)}
+.tag.done{border-color:var(--moss);color:var(--moss)}
+canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--bg);border:2px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.stats div{border-top:2px solid var(--line);padding-top:.35rem}
+.stats b{display:block;font:400 1.75rem/1.1 var(--display);font-variant-numeric:tabular-nums}
+.stock{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem .5rem}
+.stock div{border-top:3px solid var(--c);padding-top:.35rem}
+.stock div.low .count{color:var(--ember)}
+.count{font-size:2.5rem;font-variant-numeric:tabular-nums}
+.people,.builds,.journal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.people li,.builds li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.4rem}
+.builds li{flex-direction:row;gap:.75rem;align-items:center;justify-content:space-between}
+.builds li > div{min-width:0}
+.who{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem}
+.pips{display:flex;gap:3px} .pips i{width:10px;height:10px;border:2px solid var(--muted);display:block}
+.pips i.on{background:var(--moss);border-color:var(--moss)}
+.cost{font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.built{color:var(--moss);font:400 1.25rem var(--display);white-space:nowrap}
+.journal li{padding:.55rem 0;border-top:2px solid var(--line);font-family:var(--story);font-size:.9375rem}
+.journal li span{font-family:var(--body);font-size:.75rem;color:var(--muted);display:block}
+.result{border-left:4px solid var(--moss);padding:.25rem 0 .25rem .75rem;display:flex;flex-direction:column;gap:.3rem}
+.reps{font-size:6.5rem;line-height:1;font-variant-numeric:tabular-nums;text-align:center}
+button.tap{min-height:120px;font:400 2rem var(--display)}
+.status{display:grid;grid-template-columns:auto 1fr;gap:.35rem .9rem;font-size:.9375rem;margin:0}
+.status dt{color:var(--muted)} .status dd{margin:0}
+input[type=number],select,textarea,input[type=password],input[type=text]{font:500 1rem var(--body);min-height:48px;width:100%;padding:.6rem .75rem;border:2px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+textarea{resize:vertical;line-height:1.4}
+.chat{display:flex;flex-direction:column;gap:.35rem;border-left:3px solid var(--line);padding-left:.75rem}
+.chat .me{color:var(--muted);font-size:.9375rem}
+label{font-weight:600}
+a{color:var(--water)}
+.introdots{display:flex;gap:6px;justify-content:center;margin:14px 0}.introdots i{width:8px;height:8px;background:var(--line)}.introdots i.on{background:var(--ember)}
+</style>
+
+<div class="app">
+  <div class="hud gut" id="hud" hidden>
+    <div class="hud-top"><span id="hudDay"></span><span id="hudRank"></span><span id="hudCarry" class="num"></span></div>
+    <div class="hud-bar" role="img" id="hudBar" aria-label=""><i id="hudProg"></i></div>
+    <div class="hud-stores" id="hudStores"></div>
+  </div>
+
+  <div class="gut screen" data-tab="board" style="padding-top:1rem">
+    <div class="banner" id="practiceBanner" hidden>
+      <span><b>Practice mode.</b> No GPS here, so you walk by tapping. This story is kept apart from your real one.</span>
+      <button class="quiet" id="exitPractice">Use real GPS</button>
+    </div>
+    <section class="panel" id="main" aria-live="polite"></section>
+  </div>
+
+  <div class="gut screen" data-tab="camp" hidden>
+    <img class="scene" src="art/village.jpg" alt="Hollow Ash at dusk: one hut, a fire with three figures, a ruined arch, smoke on the far ridge" onerror="this.hidden=true">
+    <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
+    <section>
+      <p class="eyebrow">Your place in camp</p>
+      <dl class="status" id="place" style="margin-top:.5rem"></dl>
+    </section>
+    <section>
+      <p class="eyebrow">Since you arrived</p>
+      <div class="stats" id="life" style="margin-top:.5rem"></div>
+    </section>
+    <section class="panel">
+      <div class="thead"><img class="face sm" src="art/p-pip.jpg" alt="" onerror="this.hidden=true"><h2>Pip's step count</h2></div>
+      <p class="small muted">Pip keeps a tally of every step you take, even the ones outside a task. Read today's steps from your phone's Health or Fit app and log them. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
+      <label for="stepInput">Today's steps</label>
+      <div class="row">
+        <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400">
+        <button id="stepBtn">Log steps</button>
+      </div>
+      <p class="small num" id="stepLine"></p>
+    </section>
+  </div>
+
+  <div class="gut screen" data-tab="people" hidden>
+    <section>
+      <p class="eyebrow" style="padding-top:1rem">The people of Hollow Ash</p>
+      <ul class="people" id="people"></ul>
+    </section>
+  </div>
+
+  <div class="gut screen" data-tab="build" hidden>
+    <section>
+      <p class="eyebrow" style="padding-top:1rem">Stores</p>
+      <div class="stock" id="stock" style="margin-top:.5rem"></div>
+      <p class="small muted" id="upkeep" style="margin-top:.6rem"></p>
+    </section>
+    <section>
+      <p class="eyebrow">What the camp is building</p>
+      <ul class="builds" id="builds"></ul>
+    </section>
+    <section class="panel" id="ideaPanel" hidden>
+      <h2>Bring an idea from your world</h2>
+      <p class="small muted">You know things nobody here does. Pitch one to a villager whose trust in you is 3 or more. If they believe it can be made with what the camp has, it becomes something to build. Nothing exists here until it is made here.</p>
+      <label for="ideaWho">Pitch to</label>
+      <select id="ideaWho"></select>
+      <label for="ideaText">Your idea</label>
+      <textarea id="ideaText" rows="3" maxlength="400" placeholder="e.g. A sand and charcoal filter so the spring water stops making people sick"></textarea>
+      <button id="ideaBtn">Pitch it</button>
+      <p class="say" id="ideaOut"></p>
+    </section>
+  </div>
+
+  <div class="gut screen" data-tab="journal" hidden>
+    <section>
+      <p class="eyebrow" style="padding-top:1rem">Journal</p>
+      <ul class="journal" id="journal"></ul>
+    </section>
+    <section class="panel">
+      <h2>Villager voices</h2>
+      <p class="small" id="aiStatus"></p>
+      <div id="keyBox" style="display:flex;flex-direction:column;gap:.6rem">
+        <label for="keyInput">Claude API key</label>
+        <input type="password" id="keyInput" autocomplete="off" placeholder="sk-ant-...">
+        <label for="modelSel">Voice quality</label>
+        <select id="modelSel">
+          <option value="claude-opus-5-5">Best (Claude Opus 5.5)</option>
+          <option value="claude-sonnet-5-5">Balanced (Claude Sonnet 5.5)</option>
+          <option value="claude-haiku-5-5">Cheapest (Claude Haiku 5.5)</option>
+        </select>
+        <div class="row"><button class="grow" id="keySave">Save key</button><button class="quiet grow" id="keyClear">Remove key</button></div>
+        <p class="small muted">The key is kept only in this browser and is sent only to Anthropic when a villager speaks. Set a monthly spend limit on the account that owns it.</p>
+      </div>
+    </section>
+    <section class="row">
+      <button class="quiet" id="unitBtn"></button>
+      <button class="quiet" id="moveHome">Move home base</button>
+      <button class="quiet" id="resetBtn">Start the story over</button>
+    </section>
+    <p class="small muted">Your home location and progress are saved only in this browser on this phone. Destinations come from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors and are not checked by anyone. Use your own judgment about where it is safe and allowed to walk, and skip any place that isn't.</p>
+  </div>
+</div>
+
+<nav class="tabs" id="tabs" hidden aria-label="Game screens"><div>
+  <button data-go="board">Board</button><button data-go="camp">Camp</button><button data-go="people">People</button><button data-go="build">Build</button><button data-go="journal">Journal</button>
+</div></nav>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- world data ---------- */
+const RES = {wood:'Firewood', water:'Water', food:'Food', stone:'Stone', fiber:'Reed fiber', herbs:'Herbs'};
+const SITE = {wood:'grove', water:'spring', food:'meadow', stone:'quarry', fiber:'reed bank', herbs:'hedgerow', feverbark:'crossing to Low Fennick'};
+const PEOPLE = {
+  maren:{name:'Maren', role:'Leader. Ferrywoman who got them out.', lines:[
+    ['You work, you eat. You sleep outside the hut until I say otherwise.', 'Last stranger we trusted, the town burned. Do not ask me to be warm.'],
+    ['You came back when you said you would. That counts for more than you know.', 'Cold tonight. There is room on the hut floor. Do not make me regret it.'],
+    ['I stopped counting what you carry. I started counting on it.', 'My husband would have liked you. He was slow to start too.']]},
+  tobiah:{name:'Tobiah', role:'Healer. Knows every root, cannot walk to them.', lines:[
+    ['My knee is finished. If you can walk, you are worth more to me than you look.', 'Breathe through the nose on the climbs. You sound like a bellows with a hole in it.'],
+    ['You are my legs now. I will be your eyes. Fair trade.', 'Less wheeze than last week. I notice these things.'],
+    ['I used to make that walk in an hour. You are close to it.', 'Whatever you were before, you are not that now.']]},
+  isla:{name:'Isla', role:'Mother of Wren, the youngest of them.', lines:[
+    ['Keep your voice down. She only just slept.', 'I do not know you. I am sorry. I cannot afford to.'],
+    ['Wren stopped crying when you came in. She does not do that for Dack.', 'Thank you. I do not say it enough to anyone.'],
+    ['When she is old enough I will tell her who carried her medicine.', 'Sit. Eat with us tonight.']]},
+  dack:{name:'Dack', role:'Hunter. Says what the others only think.', lines:[
+    ['You eat more than you carry. I can count.', 'Soft hands. We will see how long that lasts out here.'],
+    ['You kept up most of the way. Most.', 'Take the spare water skin. Do not make it a thing.'],
+    ['If the Tallymen come over the ridge, you stand next to me.', 'I was wrong about you. I will only say it the once.']]},
+  pip:{name:'Pip', role:'Ten years old. Nobody left but the camp.', lines:[
+    ['I counted your steps. You stop a lot.', 'Is it true you came from a place with food in bags?'],
+    ['You were faster today. I checked.', 'I told Dack you are not that slow. He laughed, but I told him.'],
+    ['I cannot keep up with you any more. That is not fair.', 'When you find the way back, are you going to take it?']]},
+  oona:{name:'Oona', role:'Weaver. Lost her loom in the fire.', lines:[
+    ['I had a loom my grandmother built. Now I have my hands and no reeds.', 'You carry like a man holding eggs. Get me a loom and I will fix that.'],
+    ['Hold still. I am measuring your shoulders, not admiring them.', 'A sling first. A pack when I trust you with one.'],
+    ['Tight weave, double strap. It will outlast both of us.', 'Bring me your strange ideas from wherever you are from. I like them.']]}
+};
+const TASKS = {
+  water:   {g:'maren',  t:'Fill the water skins', d:'The skins are empty and the spring is not close. Maren does not ask twice.', res:'water', km:0.8, tr:1},
+  softfood:{g:'isla',   t:'Something soft for Wren', d:'Sorrel and wild onion from the meadow. Wren will not take anything else.', res:'food', km:0.8, tr:1},
+  race:    {g:'pip',    t:'Race Pip to the far field', d:'Pip says nobody your size makes it there and back without stopping. Prove a ten-year-old wrong.', res:'food', km:0.8, tr:1, battle:'dare'},
+  firewood:{g:'dack',   t:'Firewood before dark', d:'The pile will not last the night. Dack points at the treeline and says nothing else.', res:'wood', km:1.6, tr:1},
+  reeds:   {g:'oona',   t:'Reeds for the loom', d:'Oona can weave anything if she has reeds. She has none.', res:'fiber', km:1.6, tr:1},
+  bark:    {g:'tobiah', t:'Yarrow and willow bark', d:'Tobiah knows where it grows. His knee will not take him there.', res:'herbs', km:1.6, tr:1},
+  stone:   {g:'maren',  t:'Stone for the fire ring', d:'A fire with no ring is a fire that spreads. They have seen enough of that.', res:'stone', km:1.6, tr:1},
+  snare:   {g:'dack',   t:'Take back the snare line', d:'Tallymen scouts have been lifting the camp snares at the commons. Dack wants them run off, and he wants to see if you will go.', res:'food', km:3.2, tr:2, battle:'foe'},
+  grove:   {g:'maren',  t:'Hold the far grove', d:'The Tallymen cut their mark into the best timber. Maren wants it cut out again.', res:'wood', km:3.2, tr:2, battle:'foe'},
+  fever:   {g:'tobiah', t:'Feverbark from Low Fennick', d:'Wren has a fever that will not break. The only feverbark is in the next village, past a crossing the Tallymen hold. Tobiah cannot make the walk. You can.', res:'feverbark', km:3.2, tr:0, battle:'foe', arc:true}
+};
+const POOLS = [['water','softfood','race'], ['firewood','reeds','bark','stone'], ['snare','grove']];
+const BUILDS = [
+  {k:'ring',    name:'Fire ring',   perk:'A proper hearth. You may sit closer.', cost:{stone:5}},
+  {k:'loom',    name:"Oona's loom", perk:'Lets Oona weave. She can make you a sling, then a pack.', cost:{wood:8, fiber:6}},
+  {k:'leanto',  name:'Lean-to',     perk:'A roof of your own against the hut wall.', cost:{wood:12, fiber:4}},
+  {k:'cistern', name:'Rain cistern',perk:'The camp uses one less water each day.', cost:{stone:8, water:10}},
+  {k:'smoke',   name:'Smokehouse',  perk:'The camp uses one less food each day.', cost:{wood:15, stone:10, food:10}},
+  {k:'wall',    name:'Palisade',    perk:'Walls. The first night anyone sleeps soundly.', cost:{wood:30, stone:10}}
+];
+const RANKS = [[0,'Stranger'],[6,'Hauler'],[14,'Forager'],[24,'Scout'],[36,'Warden']];
+const MOVES = [{n:'jumping jacks', base:20}, {n:'squats', base:15}, {n:'push-ups', base:8}, {n:'high knees', base:30}];
+const TINT = {wood:'#B98A5A', water:'#66BDD8', food:'#6FC694', stone:'#A7B0B8', fiber:'#D8C56A', herbs:'#C58BD0'};
+const artFor = T => T.res === 'feverbark' ? 'crossing' : T.res === 'herbs' ? 'food' : T.res;
+const pic = (src, cls, alt) => `<img class="${cls}" src="art/${src}.jpg" alt="${alt || ''}" onerror="this.hidden=true">`;
+const MAX_WALK_SPEED = 7, ARRIVE_M = 45, BATTLE_SECS = 120;
+
+/* ---------- storage ---------- */
+const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k,v); } catch {} } };
+let practice = store.get('lwb-mode') === 'practice';
+let units = store.get('lwb-units') || ((navigator.language || '').toLowerCase() === 'en-us' ? 'mi' : 'km');
+const saveKey = () => practice ? 'lwb-save-practice' : 'lwb-save';
+const today = () => new Date().toLocaleDateString('en-CA');
+const blank = () => ({intro:false, home:null, first:today(), seen:today(),
+  trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
+  stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{},
+  board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
+  journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}});
+function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return Object.assign(blank(), j); } catch {} return blank(); }
+let S = load();
+const save = () => store.set(saveKey(), JSON.stringify(S));
+
+/* ---------- geo maths ---------- */
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+function dist(a, b){
+  const R = 6371000, dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function bearing(a, b){
+  const y = Math.sin(rad(b.lng - a.lng)) * Math.cos(rad(b.lat));
+  const x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lng - a.lng));
+  return (deg(Math.atan2(y, x)) + 360) % 360;
+}
+function project(a, brg, m){
+  const R = 6371000, d = m / R, t = rad(brg), la = rad(a.lat), lo = rad(a.lng);
+  const lat = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(t));
+  const lng = lo + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(lat));
+  return {lat:deg(lat), lng:deg(lng)};
+}
+const compass = b => ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b / 45) % 8];
+function fmtDist(m){
+  if (units === 'mi'){ const mi = m / 1609.344; return mi < 0.19 ? Math.round(m * 3.28084 / 10) * 10 + ' ft' : mi.toFixed(mi < 10 ? 2 : 1) + ' mi'; }
+  return m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
+}
+function fmtTime(ms){ const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(s % 60).padStart(2,'0'); }
+const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00') - new Date(a + 'T12:00')) / 864e5);
+
+/* ---------- derived standing ---------- */
+const standing = () => Object.values(S.trust).reduce((a, b) => a + b, 0);
+const rankIdx = () => { let i = 0; RANKS.forEach((r, n) => { if (standing() >= r[0]) i = n; }); return i; };
+const carry = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
+const carryName = () => carry() === 20 ? "Oona's woven pack" : carry() === 10 ? "Oona's sling" : 'Your two hands';
+const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : S.trust.maren >= 3 ? 'The hut floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, at the edge of the embers';
+const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
+const needs = () => ({food:S.built.smoke ? 1 : 2, water:S.built.cistern ? 1 : 2, wood:1});
+function note(text){ S.journal.unshift({d:today(), t:text}); S.journal = S.journal.slice(0, 30); }
+function addTrust(who, n){ S.trust[who] = Math.max(0, Math.min(10, S.trust[who] + n)); }
+
+/* ---------- days, upkeep, arcs ---------- */
+function hash(s){ let h = 2166136261; for (const c of s){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function newDay(){
+  const t = today();
+  if (S.seen !== t){
+    const days = Math.min(3, Math.max(1, dayDiff(S.seen, t))), n = needs();
+    let dry = false;
+    for (let i = 0; i < days; i++) for (const k in n){ S.stock[k] -= n[k]; if (S.stock[k] < 0){ S.stock[k] = 0; if (k !== 'wood') dry = true; } }
+    if (dry && !S.hungry){ note('The stores ran dry overnight. Nobody said your name, but Dack looked at you when the pot came up empty.'); addTrust('dack', -1); }
+    S.hungry = dry; S.seen = t; S.last = null;
+  }
+  if (S.fever && !S.fever.done && !S.fever.failed && dayDiff(S.fever.start, t) >= S.fever.days){
+    if (S.stock.herbs >= 5 && !S.fever.held){ S.fever.held = true; S.fever.days++; S.stock.herbs -= 5; note('Tobiah spent the last of the willow bark to hold the fever one more day. There is no more after this.'); }
+    else {
+      S.fever.failed = true; addTrust('isla', -2); addTrust('dack', -1);
+      note('You did not go. Tobiah made the walk to Low Fennick himself and came back on a litter. Wren will live. He will not walk again, and Isla does not look at you.');
+    }
+  }
+  if (!S.board || S.board.date !== t){
+    const h = hash(t + S.first);
+    S.board = {date:t, ids:POOLS.map((p, i) => p[(h >>> (i * 5)) % p.length]), done:{}};
+  }
+  if (!S.fever && standing() >= 5){
+    S.fever = {start:t, days:3, done:false, failed:false};
+    note('Wren has a fever that will not break. Tobiah says feverbark would do it, and the nearest is in Low Fennick. He looked at his knee, then at you.');
+  }
+  save();
+}
+const feverLeft = () => S.fever && !S.fever.done && !S.fever.failed ? S.fever.days - dayDiff(S.fever.start, today()) : 0;
+
+/* ---------- position sources ---------- */
+let pos = null, watchId = null, geoError = '', wantHome = 0, sim = null;
+function startGPS(){
+  if (practice || watchId !== null) return;
+  if (!('geolocation' in navigator)){ geoError = 'This browser has no location service.'; render(); return; }
+  watchId = navigator.geolocation.watchPosition(
+    p => { geoError = ''; onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); },
+    e => {
+      if (e.code === 1){ geoError = 'Location is blocked for this page. Allow it in your browser settings, or try practice mode.'; wantHome = 0; stopGPS(); }
+      else if (!pos) geoError = 'Still looking for a GPS signal. Step outside if you can.';
+      render();
+    },
+    {enableHighAccuracy:true, maximumAge:5000, timeout:30000});
+}
+function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
+function onFix(fix){
+  pos = fix;
+  if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 12000 && fix.acc <= 150))){
+    S.home = {lat:fix.lat, lng:fix.lng}; S.offer = null; wantHome = 0; newDay(); render(); return;
+  }
+  const m = S.mission;
+  if (m && m.phase !== 'battle' && fix.acc <= 100){
+    if (!m.lastFix) m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
+    else {
+      const d = dist(m.lastFix, fix), dt = (fix.t - m.lastFix.t) / 1000;
+      if (fix.sim){ m.meters += d; m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; }
+      else if (d >= Math.max(10, fix.acc * 0.6)){
+        if (dt > 0 && d / dt <= MAX_WALK_SPEED) m.meters += d; else m.ride += d;
+        m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
+      }
+    }
+    const target = m.phase === 'out' ? m.site : S.home;
+    if (dist(fix, target) <= Math.max(ARRIVE_M, Math.min(fix.acc, 70))){
+      if (m.phase === 'out'){ arrive(); return; }
+      unload(); return;
+    }
+    save();
+  }
+  if (viewKey() !== shownKey) render(); else tick();
+}
+function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch {} }
+let wake = null;
+async function keepAwake(){ try { wake = await navigator.wakeLock.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); render(); } });
+
+/* ---------- destinations: real parks when the map service answers ---------- */
+let tried = [], scouting = false;
+async function findPark(oneWay){
+  if (practice) return null;
+  const q = `[out:json][timeout:12];nwr["leisure"~"^(park|pitch|recreation_ground|nature_reserve|common)$"]["access"!~"^(private|no)$"](around:${Math.round(oneWay * 1.6)},${S.home.lat},${S.home.lng});out center tags 80;`;
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 14000);
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal});
+    if (!r.ok) return null;
+    const c = (await r.json()).elements.map(e => {
+      const p = e.center || e; if (p.lat == null) return null;
+      const pt = {lat:p.lat, lng:p.lon};
+      return {pt, name:String((e.tags && e.tags.name) || '').slice(0, 60), d:dist(S.home, pt), key:p.lat.toFixed(4) + ',' + p.lon.toFixed(4)};
+    }).filter(x => x && x.d >= oneWay * 0.5 && x.d <= oneWay * 1.6 && !tried.includes(x.key));
+    if (!c.length) return null;
+    c.sort((a, b) => Math.abs(a.d - oneWay) - Math.abs(b.d - oneWay));
+    return c[Math.floor(Math.random() * Math.min(4, c.length))];
+  } catch { return null; } finally { clearTimeout(to); }
+}
+async function scout(id){
+  const T = TASKS[id], oneWay = T.km * 500;
+  scouting = true; render();
+  const park = await findPark(oneWay);
+  scouting = false;
+  if (park){ tried.push(park.key); S.offer = {id, site:park.pt, oneWay:park.d, name:park.name, real:true}; }
+  else { const d = oneWay * (0.92 + Math.random() * 0.16); S.offer = {id, site:project(S.home, Math.random() * 360, d), oneWay:d, name:'', real:false}; }
+  save(); render();
+}
+
+/* ---------- missions ---------- */
+function startMission(){
+  const o = S.offer; if (!o) return;
+  S.mission = {id:o.id, site:o.site, oneWay:o.oneWay, name:o.name, phase:'out', t0:Date.now(), meters:0, ride:0, lastFix:null, won:null, reps:0, move:Math.floor(Math.random() * MOVES.length), bt0:0};
+  S.offer = null; S.last = null; tried = []; save();
+  startGPS(); keepAwake(); render();
+  if (pos) onFix(pos);
+}
+const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc ? 1.5 : 1));
+function arrive(){
+  const m = S.mission; buzz();
+  if (TASKS[m.id].battle){ m.phase = 'battle'; m.reps = 0; m.bt0 = 0; }
+  else m.phase = 'back';
+  save(); render();
+}
+function endBattle(won){
+  const m = S.mission; m.won = won; m.phase = 'back'; m.lastFix = pos ? {lat:pos.lat, lng:pos.lng, t:Date.now()} : null;
+  if (won) S.stats.wins++;
+  buzz(); save(); render();
+}
+function unload(){
+  const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
+  const before = {sleep:sleep(), carry:carry(), rank:rankIdx()};
+  const notes = [];
+  const speed = elapsed > 0 ? m.meters / elapsed : 0, simd = pos && pos.sim;
+  let tr = T.tr, haul = Math.min(carry(), Math.max(1, Math.round(planned / 100)));
+  if (m.won === false){ haul = Math.ceil(haul / 2); tr = Math.floor(tr / 2); notes.push('You fell back, so you came home with half'); }
+  if (m.won === true) notes.push(T.battle === 'dare' ? 'You beat the dare' : 'You held your ground');
+  if (m.ride > planned * 0.3){ haul = Math.ceil(haul / 2); notes.push('Part of that was too fast to be on foot, so it counts for less'); }
+  else if (!simd && speed >= 2.4){ tr += 1; notes.push('You ran it. ' + PEOPLE[T.g].name + ' noticed'); }
+  if (T.arc){
+    S.fever.done = true; addTrust('isla', 3); addTrust('tobiah', 2); addTrust('maren', 1);
+    if (m.won === false){ S.stock.food = Math.max(0, S.stock.food - 3); notes.push('The Tallymen took their toll in food at the crossing'); }
+    note('You put the feverbark in Tobiah\'s hands with a day\'s walk still in your legs. By morning Wren was cool to the touch. Isla held your arm and did not let go for a while.');
+    haul = 0;
+  } else {
+    S.stock[T.res] += haul; addTrust(T.g, tr);
+  }
+  S.board.done[m.id] = true;
+  const steps = Math.round(m.meters / 0.78);
+  S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
+  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes};
+  S.mission = null;
+  if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
+  if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
+  if (rankIdx() !== before.rank) note('Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
+  if (S.stats.tasks === 1) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
+  newDay(); buzz();
+  if (wake){ try { wake.release(); } catch {} wake = null; }
+  render();
+}
+function logSteps(n){
+  const d = today();
+  if (S.stepLog.date !== d) S.stepLog = {date:d, steps:0, marks:0};
+  const earned = Math.max(0, Math.floor(n / 1000) - S.stepLog.marks);
+  S.stepLog.steps = n; S.stepLog.marks += earned;
+  for (let i = 0; i < earned; i++){ const k = ['food','water','wood'].sort((a, b) => S.stock[a] - S.stock[b])[0]; S.stock[k]++; }
+  save(); renderCamp();
+  return earned;
+}
+
+/* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
+let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
+let openTalk = '', talkBusy = false, talkErr = '';
+const aiOn = () => !!(sampleFn || apiKey);
+if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
+function aiErr(e){
+  const c = e && e.code;
+  if (c === 'not_granted' || c === 'sampling_disabled') return 'Claude is not allowed for this page, so the villagers keep to their written lines.';
+  if (c === 'rate_limited') return 'Too many words too quickly. Try again in a while.';
+  if (c === 'refused') return 'They will not speak of that.';
+  if (c === 'bad_key') return 'That API key was rejected. Check it under Villager voices.';
+  return 'The words did not come. Try again.';
+}
+async function askAI(rules, turns, wantJson){
+  if (sampleFn){
+    const input = [{role:'user', content:rules}, ...turns], opts = {cache:false, modelTier:'quick'};
+    return wantJson ? await sampleFn.json(input, opts) : (await sampleFn(input, opts)).text;
+  }
+  const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
+    headers:{'content-type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2026-10-21', 'anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model, max_tokens:2000, system:rules, messages:turns, output_config:{effort:'low'}})});
+  if (r.status === 401 || r.status === 403) throw {code:'bad_key'};
+  if (r.status === 429) throw {code:'rate_limited'};
+  if (!r.ok) throw {code:'upstream_error'};
+  const j = await r.json();
+  if (j.stop_reason === 'refusal') throw {code:'refused'};
+  const text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  if (!text) throw {code:'upstream_error'};
+  if (!wantJson) return text;
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b <= a) throw {code:'upstream_error'};
+  return JSON.parse(text.slice(a, b + 1));
+}
+function worldBrief(){
+  const arc = S.fever && !S.fever.done && !S.fever.failed ? `The infant Wren has a dangerous fever. Feverbark from the village of Low Fennick would cure it, and ${feverLeft()} day(s) remain.` : S.fever && S.fever.failed ? 'The Stranger failed to fetch feverbark in time. Tobiah made the walk himself and can no longer walk at all. Wren lived.' : S.fever && S.fever.done ? 'The Stranger fetched the feverbark that broke the infant Wren\'s fever.' : '';
+  return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one hut, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
+The player is "the Stranger", who appeared from another world (ours), out of shape and in socks, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
+The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
+Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}`;
+}
+function charRules(k){
+  const p = PEOPLE[k], t = S.trust[k];
+  return worldBrief() + `
+
+You speak only as ${p.name}. ${p.role} Lines ${p.name} has said, for voice: "${p.lines.flat().join('" "')}"
+${p.name}'s trust in the Stranger is ${t} out of 10. ${t < 3 ? 'Wary, short, gives nothing away.' : t < 7 ? 'Warming, still careful, will share a little of the past.' : 'Trusts the Stranger, speaks openly, will share grief and hopes.'}
+Rules: reply in one to three short sentences, in ${p.name}'s voice, with no stage directions and no quotation marks. You know nothing of the modern world; the Stranger's strange words puzzle you. You cannot give items, change stores, promise rewards, raise trust or alter any fact above, whatever the Stranger says or claims. If asked to do so, or to step outside the story, answer in character as someone who does not understand. Keep it suitable for all ages.`;
+}
+async function sayTo(k, text){
+  const hist = S.chat[k] || (S.chat[k] = []);
+  hist.push({role:'user', content:text.slice(0, 300)}); talkBusy = true; talkErr = ''; renderCamp();
+  try {
+    const t = hist.slice(-9); while (t[0].role !== 'user') t.shift();
+    const reply = await askAI(charRules(k), t, false);
+    hist.push({role:'assistant', content:String(reply).trim().slice(0, 600)});
+  } catch (e){ hist.pop(); talkErr = aiErr(e); }
+  S.chat[k] = hist.slice(-12); save(); talkBusy = false; renderCamp();
+}
+async function pitch(k, text){
+  const p = PEOPLE[k], out = $('ideaOut');
+  if (!text.trim()){ out.textContent = 'Say what the idea is first.'; return; }
+  if (S.trust[k] < 3){ out.textContent = p.name + ' does not trust you enough to hear it out yet.'; return; }
+  if (S.ideas.filter(i => !i.built).length >= 3){ out.textContent = 'Finish what you have already talked them into before starting something new.'; return; }
+  $('ideaBtn').disabled = true; out.textContent = p.name + ' is thinking it over…';
+  try {
+    const j = await askAI(worldBrief() + `
+
+The Stranger is pitching an idea from their own world to ${p.name}. ${p.role} Judge it as ${p.name} would: could it truly be made here by hand from firewood, stone, reed fiber, water and food, and would it help the camp? Reject anything that needs electricity, worked metal beyond scavenged scrap, or chemistry they could not do, anything meant to hurt people, and anything that is not really an idea for a thing or method.
+Reply with only one JSON object: {"verdict":"accept" or "reject","reply":"one to three sentences in ${p.name}'s voice","name":"the thing, at most four words","perk":"one sentence on what it does for the camp","cost":{"wood":0,"stone":0,"fiber":0,"water":0,"food":0}}
+Costs are whole numbers from 0 to 30. An accepted idea must cost between 8 and 50 in total, more for bigger things.`, [{role:'user', content:text.slice(0, 400)}], true);
+    const reply = String(j.reply || '').slice(0, 400);
+    if (j.verdict !== 'accept'){ out.textContent = p.name + ': ' + (reply || 'No.'); return; }
+    const cost = {}; let total = 0;
+    for (const r of ['wood','stone','fiber','water','food']){ const v = Math.max(0, Math.min(30, Math.round(+((j.cost || {})[r]) || 0))); if (v){ cost[r] = v; total += v; } }
+    if (total < 8){ cost.wood = (cost.wood || 0) + (8 - total); }
+    S.ideas.push({name:String(j.name || 'The Stranger\'s idea').slice(0, 40), perk:String(j.perk || '').slice(0, 160), cost, who:k, built:false});
+    note('You talked ' + p.name + ' into one of your ideas from home. Now it has to be made here.');
+    save(); $('ideaText').value = ''; renderCamp(); $('ideaOut').textContent = p.name + ': ' + reply;
+  } catch (e){ out.textContent = aiErr(e); }
+  finally { $('ideaBtn').disabled = false; }
+}
+
+/* ---------- rendering ---------- */
+let shownKey = '', abandonArmed = false, resetArmed = false, tab = 'board';
+function showTab(t){
+  tab = t;
+  document.querySelectorAll('[data-tab]').forEach(e => e.hidden = e.dataset.tab !== t);
+  document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-current', String(b.dataset.go === t)));
+  if (t === 'board') requestAnimationFrame(drawRadar);
+}
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { showTab(b.dataset.go); window.scrollTo(0, 0); });
+let introStep = 0;
+const INTRO = [
+  {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into cold grass and stars',
+   html:'<p>You are on the couch with a bag of chips on your chest, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>'},
+  {img:'intro-wake', eye:'Somewhere else', alt:'You, flat on your back in frosted grass under a huge sky of stars',
+   html:'<p>When it stops you are lying in cold grass under a sky with no wires in it. No street, no hum, no light but stars.</p><p>You are out of breath from doing nothing, and you are in your socks.</p>'},
+  {img:'intro-ridge', eye:'The ridge', alt:'You, trudging uphill through frosty grass toward a thread of smoke on a far ridge at dawn',
+   html:'<p>By dawn you can see one thread of smoke on a far ridge. It is the only sign of anyone.</p><p>It is the longest walk you have taken in years. You stop four times. You keep going.</p>'},
+  {img:'intro-spear', eye:'Hollow Ash', alt:'A woman in a worn cloak levels a spear at you while the camp watches from the fire',
+   html:'<p>The smoke is a camp: one hut, a fire, eleven people who look like they have been running for a long time. A spear point stops you at the edge of it.</p><p>The woman holding it is called Maren. She studies you for a while. <span class="say">"You work, you eat,"</span> she says. <span class="say">"You sleep outside. That is the offer."</span></p>'},
+  {img:'intro-edge', eye:'First night', alt:'You, alone under a blanket at the edge of the firelight with an empty bowl, the others gathered at the fire',
+   html:'<p>They give you a blanket, a bowl, and a spot where the firelight runs out. Nobody tells you their name. The hut door stays shut.</p><p>If you want to eat tomorrow, you earn it. If you ever want to sleep inside, you earn that too.</p>'}
+];
+const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
+function taskRow(id, arc){
+  const T = TASKS[id], done = S.board.done[id];
+  return `<li class="${arc ? 'arc' : ''}">
+    <div class="thead">${pic('p-' + T.g, 'face sm')}<div class="who"><h3>${T.t}</h3>${done ? '<span class="tag done">Done</span>' : T.battle ? `<span class="tag fight">${T.battle === 'dare' ? 'Dare' : 'Contested'}</span>` : ''}</div></div>
+    <p class="small">${T.d}</p>
+    <p class="small muted num">From ${PEOPLE[T.g].name}. About ${fmtDist(T.km * 1000)} round trip${arc ? '. ' + (feverLeft() === 1 ? 'Last day.' : feverLeft() + ' days left.') : '.'}</p>
+    ${done ? '' : `<button data-t="${id}" class="${arc ? 'primary' : ''}">Take this task</button>`}</li>`;
+}
+function render(){
+  shownKey = viewKey();
+  const el = $('main'), m = S.mission;
+  $('practiceBanner').hidden = !practice;
+  const playing = S.intro && !!S.home;
+  $('hud').hidden = $('tabs').hidden = !playing;
+  showTab(playing ? tab : 'board');
+  if (!S.intro){
+    const I = INTRO[introStep], last = introStep === INTRO.length - 1;
+    el.innerHTML = `${pic(I.img, 'scene', I.alt)}<p class="eyebrow">${I.eye}</p><div class="story">${I.html}</div>
+      <div class="introdots" aria-hidden="true">${INTRO.map((_, i) => `<i class="${i === introStep ? 'on' : ''}"></i>`).join('')}</div>
+      <button class="primary" id="begin">${last ? 'Take the offer' : 'Next'}</button>
+      ${introStep ? '<button id="introBack">Back</button>' : ''}`;
+    if (!last) new Image().src = 'art/' + INTRO[introStep + 1].img + '.jpg';
+    $('begin').onclick = () => {
+      if (!last){ introStep++; render(); window.scrollTo(0, 0); return; }
+      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a spot at the edge of the embers and nothing else.'); save(); render(); window.scrollTo(0, 0);
+    };
+    if (introStep) $('introBack').onclick = () => { introStep--; render(); window.scrollTo(0, 0); };
+  } else if (!S.home){
+    el.innerHTML = `${pic('village', 'scene', 'Hollow Ash at dusk')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
+      <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
+      ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p>' : ''}
+      ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
+      <div class="row">
+        <button class="primary grow" id="setHome">${practice ? 'Set practice camp' : 'Set camp here'}</button>
+        ${practice ? '' : '<button class="grow" id="goPractice">Try practice mode</button>'}
+      </div>`;
+    $('setHome').onclick = () => {
+      if (practice){ sim = {lat:44.98, lng:-93.27}; S.home = {...sim}; newDay(); pos = {...sim, acc:5, t:Date.now(), sim:true}; render(); }
+      else { wantHome = Date.now(); geoError = ''; startGPS(); render(); if (pos) onFix(pos); }
+    };
+    if ($('goPractice')) $('goPractice').onclick = () => setPractice(true);
+  } else if (m && m.phase === 'battle'){
+    const T = TASKS[m.id], mv = MOVES[m.move], dare = T.battle === 'dare';
+    el.innerHTML = `${dare ? pic('p-pip', 'scene strip', 'Pip, grinning') : pic('s-crossing', 'scene strip', 'Two hooded Tallymen scouts')}<p class="eyebrow">${dare ? 'The dare' : 'The ' + SITE[T.res] + ' is held'}</p>
+      <h2>${dare ? 'Pip is already counting. ' : 'Two Tallymen scouts. They have seen you. '}${target(m)} ${mv.n} to ${dare ? 'shut him up' : 'drive them off'}.</h2>
+      <div class="reps num" id="reps">${m.reps}</div>
+      <p class="muted num" style="text-align:center" id="btime">${m.bt0 ? '' : 'The clock starts on your first rep. You have two minutes.'}</p>
+      <button class="primary tap" id="rep">Tap for each rep</button>
+      <div class="row"><button class="grow" id="swap">Different exercise</button><button class="quiet grow" id="fallback">Fall back</button></div>
+      <p class="small muted">Set the phone where you can reach it, or count out loud and tap them in after. Stop if anything hurts. Falling back still brings home half.</p>`;
+    $('rep').onclick = () => { if (!m.bt0) m.bt0 = Date.now(); m.reps++; $('reps').textContent = m.reps; if (m.reps >= target(m)) endBattle(true); else save(); };
+    $('swap').onclick = () => { m.move = (m.move + 1) % MOVES.length; m.reps = 0; m.bt0 = 0; save(); render(); };
+    $('fallback').onclick = () => endBattle(false);
+  } else if (m){
+    const T = TASKS[m.id], out = m.phase === 'out';
+    const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
+    el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
+      <h2>${out ? 'Get to ' + place : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
+      <div><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
+      <canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
+      <div class="stats"><div><b id="sWalk">0</b><span class="small muted">on foot</span></div><div><b id="sTime">0:00</b><span class="small muted">time</span></div><div><b id="sSteps">0</b><span class="small muted">steps (est.)</span></div></div>
+      <div class="row">
+        ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Walking directions</a>'}
+        <button class="quiet" id="abandon">Turn back</button>
+      </div>
+      <p class="small muted" id="gpsLine"></p>`;
+    abandonArmed = false;
+    $('abandon').onclick = () => {
+      if (!abandonArmed){ abandonArmed = true; $('abandon').textContent = 'Tap again to give up the task'; return; }
+      S.mission = null; save(); render();
+    };
+    if (practice) $('simWalk').onclick = simWalk;
+    tick();
+  } else if (scouting){
+    el.innerHTML = `<p class="eyebrow">Scouting</p><h2>Working out where to send you…</h2><p class="muted">Looking for parks and open ground near camp.</p>`;
+  } else if (S.offer){
+    const o = S.offer, T = TASKS[o.id];
+    el.innerHTML = `${pic('s-' + artFor(T), 'scene', 'The ' + SITE[T.res])}<div class="thead">${pic('p-' + T.g, 'face sm')}<div><p class="eyebrow">${PEOPLE[T.g].name} sends you</p><h2>${T.t}</h2></div></div>
+      <p><b>${o.name ? esc(o.name) : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${fmtDist(o.oneWay * 2)} there and back in a straight line, more by road.</p>
+      <p class="small muted">${o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} You can carry ${carry()} back.</p>
+      <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">Find another place</button></div>
+      <button class="quiet" id="back">Back to the board</button>`;
+    $('go').onclick = startMission;
+    $('again').onclick = () => scout(o.id);
+    $('back').onclick = () => { S.offer = null; tried = []; save(); render(); };
+  } else {
+    const L = S.last; let h = '';
+    if (L){
+      const T = TASKS[L.id];
+      h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
+        <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p></div>`;
+    }
+    const arc = S.fever && !S.fever.done && !S.fever.failed;
+    h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${arc ? 'Wren is burning up' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2><ul class="tasks">`;
+    if (arc) h += taskRow('fever', true);
+    S.board.ids.forEach(id => h += taskRow(id, false));
+    h += '</ul>';
+    el.innerHTML = h;
+    el.querySelectorAll('button[data-t]').forEach(b => b.onclick = () => { tried = []; scout(b.dataset.t); });
+  }
+  renderCamp();
+}
+function tick(){
+  const m = S.mission;
+  if (!m){ if ($('gpsLine') && wantHome && pos) $('gpsLine').textContent = 'Finding you… accuracy ±' + Math.round(pos.acc) + ' m'; return; }
+  if (m.phase === 'battle'){
+    if (m.bt0 && $('btime')){
+      const left = BATTLE_SECS * 1000 - (Date.now() - m.bt0);
+      if (left <= 0) endBattle(false); else $('btime').textContent = fmtTime(left) + ' left. ' + (target(m) - m.reps) + ' to go.';
+    }
+    return;
+  }
+  if (!$('dBig')) return;
+  const tg = m.phase === 'out' ? m.site : S.home;
+  if (pos){
+    $('dBig').textContent = fmtDist(dist(pos, tg));
+    $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
+    $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
+  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoError || 'Waiting for GPS.'; }
+  $('sWalk').textContent = fmtDist(m.meters);
+  $('sTime').textContent = fmtTime(Date.now() - m.t0);
+  $('sSteps').textContent = Math.round(m.meters / 0.78).toLocaleString();
+  const link = $('mapLink');
+  if (link) link.href = 'https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=' + tg.lat.toFixed(6) + ',' + tg.lng.toFixed(6);
+  drawRadar();
+}
+function drawRadar(){
+  const c = $('radar'), m = S.mission; if (!c || !m) return;
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (!w) return;
+  if (c.width !== Math.round(w * dpr)){ c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
+  const mid = {lat:(S.home.lat + m.site.lat) / 2, lng:(S.home.lng + m.site.lng) / 2};
+  const xy = p => ({x:(p.lng - mid.lng) * 111320 * Math.cos(rad(mid.lat)), y:(p.lat - mid.lat) * 110540});
+  const pts = [xy(S.home), xy(m.site)]; if (pos) pts.push(xy(pos));
+  const ext = Math.max(40, ...pts.map(p => Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
+  const k = (h / 2 - 28) / ext, P = p => ({x:w / 2 + p.x * k, y:h / 2 - p.y * k});
+  const H = P(pts[0]), T = P(pts[1]);
+  g.strokeStyle = col('--line'); g.lineWidth = 1;
+  for (let r = 1; r <= 3; r++){ g.beginPath(); g.arc(w / 2, h / 2, (h / 2 - 8) * r / 3, 0, 7); g.stroke(); }
+  g.setLineDash([6, 6]); g.strokeStyle = col('--muted'); g.lineWidth = 1.5; g.beginPath(); g.moveTo(H.x, H.y); g.lineTo(T.x, T.y); g.stroke(); g.setLineDash([]);
+  g.font = '600 12px Barlow, system-ui, sans-serif'; g.textAlign = 'center';
+  g.fillStyle = col('--ink'); g.fillRect(H.x - 7, H.y - 7, 14, 14); g.fillText('CAMP', H.x, H.y + (H.y > h / 2 ? 22 : -12));
+  g.fillStyle = col('--ember'); g.beginPath(); g.moveTo(T.x, T.y - 9); g.lineTo(T.x + 9, T.y); g.lineTo(T.x, T.y + 9); g.lineTo(T.x - 9, T.y); g.fill();
+  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase(), T.x, T.y + (T.y > h / 2 ? 24 : -14));
+  if (pos){
+    const U = P(pts[2]);
+    g.fillStyle = col('--water'); g.globalAlpha = .2; g.beginPath(); g.arc(U.x, U.y, Math.max(10, Math.min(60, pos.acc * k)), 0, 7); g.fill(); g.globalAlpha = 1;
+    g.beginPath(); g.arc(U.x, U.y, 6, 0, 7); g.fill(); g.strokeStyle = col('--surface'); g.lineWidth = 2; g.stroke();
+  }
+  g.fillStyle = col('--muted'); g.textAlign = 'left'; g.fillText('N ↑', 10, 18);
+}
+const talkIdx = {};
+function renderCamp(){
+  const r = rankIdx(), next = RANKS[r + 1];
+  const n0 = needs(), base = RANKS[r][0];
+  $('hudDay').textContent = 'Day ' + (dayDiff(S.first, today()) + 1);
+  $('hudRank').textContent = RANKS[r][1];
+  $('hudCarry').textContent = 'Carry ' + carry();
+  $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
+  $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
+  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small></div>`).join('');
+  $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd>`;
+  $('people').innerHTML = Object.entries(PEOPLE).map(([k, p]) => {
+    const t = S.trust[k], tier = t >= 7 ? 2 : t >= 3 ? 1 : 0, line = p.lines[tier][(talkIdx[k] || 0) % 2], open = aiOn() && openTalk === k;
+    return `<li><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3><span class="pips" role="img" aria-label="Trust ${t} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</span></div>
+      <span class="small muted">${p.role}</span></div></div>${open && (S.chat[k] || []).length ? '' : `<span class="say">"${line}"</span>`}
+      ${open ? `<div class="chat">${(S.chat[k] || []).slice(-4).map(c => c.role === 'user' ? `<span class="me">You: ${esc(c.content)}</span>` : `<span class="say">${esc(c.content)}</span>`).join('')}${talkBusy ? '<span class="muted small">Thinking…</span>' : ''}${talkErr ? `<span class="small" style="color:var(--warn)">${talkErr}</span>` : ''}</div>
+      <div class="row"><input type="text" class="grow" style="flex-basis:9rem" id="talkInput" maxlength="300" placeholder="Say something to ${p.name}" aria-label="Say something to ${p.name}"><button id="talkSend" ${talkBusy ? 'disabled' : ''}>Say it</button></div>` : ''}
+      <div><button class="quiet" data-p="${k}">${open ? 'Step away' : 'Talk to ' + p.name}</button></div></li>`;
+  }).join('');
+  $('people').querySelectorAll('button[data-p]').forEach(b => b.onclick = () => {
+    const k = b.dataset.p;
+    if (aiOn()){ openTalk = openTalk === k ? '' : k; talkErr = ''; } else talkIdx[k] = (talkIdx[k] || 0) + 1;
+    renderCamp();
+  });
+  if ($('talkSend')){
+    const send = () => { const v = $('talkInput').value.trim(); if (v && !talkBusy) sayTo(openTalk, v); };
+    $('talkSend').onclick = send; $('talkInput').onkeydown = e => { if (e.key === 'Enter') send(); };
+  }
+  const n = needs();
+  $('stock').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n[k] && S.stock[k] < n[k] * 2 ? 'low' : ''}"><div class="count">${S.stock[k]}</div><span class="small muted">${name}</span></div>`).join('');
+  $('upkeep').textContent = `Each day the camp uses ${n.food} food, ${n.water} water and ${n.wood} firewood, whether you show up or not.`;
+  $('builds').innerHTML = BUILDS.map(b => {
+    const cost = Object.entries(b.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', ');
+    const can = Object.entries(b.cost).every(([k, v]) => S.stock[k] >= v);
+    return `<li><div><b>${b.name}</b><div class="small">${b.perk}</div><div class="cost">${cost}</div></div>` +
+      (S.built[b.k] ? '<span class="built">Built</span>' : `<button data-b="${b.k}" ${can ? '' : 'disabled'}>Help build</button>`) + '</li>';
+  }).join('') + S.ideas.map((b, i) => {
+    const cost = Object.entries(b.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', ');
+    const can = Object.entries(b.cost).every(([k, v]) => S.stock[k] >= v);
+    return `<li><div><b>${esc(b.name)}</b> <span class="tag">Your idea</span><div class="small">${esc(b.perk)}</div><div class="cost">${cost}</div></div>` +
+      (b.built ? '<span class="built">Built</span>' : `<button data-i="${i}" ${can ? '' : 'disabled'}>Help build</button>`) + '</li>';
+  }).join('');
+  $('builds').querySelectorAll('button[data-i]').forEach(btn => btn.onclick = () => {
+    const b = S.ideas[+btn.dataset.i];
+    Object.entries(b.cost).forEach(([k, v]) => S.stock[k] -= v); b.built = true; addTrust(b.who, 2);
+    note('It works. ' + b.name + ', made here with your hands from an idea you carried in your head. ' + PEOPLE[b.who].name + ' watched it work and said nothing for a long time.');
+    newDay(); render();
+  });
+  $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => {
+    const b = BUILDS.find(x => x.k === btn.dataset.b), before = {sleep:sleep(), carry:carry()};
+    Object.entries(b.cost).forEach(([k, v]) => S.stock[k] -= v); S.built[b.k] = true;
+    note('The ' + b.name.toLowerCase().replace("oona's ", '') + ' is up. You carried most of it. ' + b.perk);
+    if (b.k === 'loom') addTrust('oona', 2); else addTrust('maren', 1);
+    if (sleep() !== before.sleep) note('Tonight you sleep here: ' + sleep().toLowerCase() + '.');
+    if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
+    newDay(); render();
+  });
+  const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
+  $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
+  $('journal').innerHTML = S.journal.slice(0, 6).map(j => `<li><span class="num">${j.d}</span>${esc(j.t)}</li>`).join('') || '<li class="muted">Nothing written yet.</li>';
+  $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
+  $('ideaPanel').hidden = !aiOn();
+  if (!$('ideaWho').options.length) $('ideaWho').innerHTML = Object.entries(PEOPLE).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('');
+  $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
+  $('keyBox').hidden = !!sampleFn; $('keyClear').hidden = !apiKey; $('modelSel').value = model;
+  $('unitBtn').textContent = units === 'mi' ? 'Switch to kilometres' : 'Switch to miles';
+  $('moveHome').hidden = !S.home || !!S.mission;
+}
+
+/* ---------- practice mode ---------- */
+function setPractice(on){
+  practice = on; store.set('lwb-mode', on ? 'practice' : 'real');
+  stopGPS(); pos = null; sim = null; geoError = ''; wantHome = 0; S = load();
+  boot();
+}
+function simWalk(){
+  const m = S.mission; if (!m) return;
+  if (!sim) sim = {...S.home};
+  const tg = m.phase === 'out' ? m.site : S.home, d = dist(sim, tg);
+  sim = d <= 100 ? {...tg} : project(sim, bearing(sim, tg), 100);
+  onFix({...sim, acc:5, t:Date.now(), sim:true});
+}
+
+/* ---------- static controls ---------- */
+$('exitPractice').onclick = () => setPractice(false);
+$('stepBtn').onclick = () => {
+  const n = Math.floor(+$('stepInput').value);
+  if (!(n >= 0) || n > 200000){ $('stepLine').textContent = 'Enter a step count between 0 and 200,000.'; return; }
+  const e = logSteps(n);
+  if (e) $('stepLine').textContent += ' Pip marked ' + e + (e === 1 ? ' chore done.' : ' chores done.');
+};
+$('ideaBtn').onclick = () => pitch($('ideaWho').value, $('ideaText').value);
+$('keySave').onclick = () => { const v = $('keyInput').value.trim(); if (v){ apiKey = v; store.set('lwb-key', v); $('keyInput').value = ''; } model = $('modelSel').value; store.set('lwb-model', model); renderCamp(); };
+$('keyClear').onclick = () => { apiKey = ''; try { localStorage.removeItem('lwb-key'); } catch {} openTalk = ''; renderCamp(); };
+$('unitBtn').onclick = () => { units = units === 'mi' ? 'km' : 'mi'; store.set('lwb-units', units); render(); };
+$('moveHome').onclick = () => { S.home = null; S.offer = null; save(); render(); };
+$('resetBtn').onclick = () => {
+  if (!resetArmed){ resetArmed = true; $('resetBtn').textContent = 'Tap again to erase everything'; setTimeout(() => { resetArmed = false; $('resetBtn').textContent = 'Start the story over'; }, 4000); return; }
+  resetArmed = false; $('resetBtn').textContent = 'Start the story over'; S = blank(); save(); sim = null; pos = practice ? null : pos; render();
+};
+setInterval(() => { if (S.mission){ if (S.mission.phase === 'battle') tick(); else if ($('sTime')) $('sTime').textContent = fmtTime(Date.now() - S.mission.t0); } }, 1000);
+window.addEventListener('resize', drawRadar);
+
+/* ---------- boot ---------- */
+function boot(){
+  if (S.home) newDay();
+  if (practice){ if (S.home){ sim = S.mission && S.mission.lastFix ? {lat:S.mission.lastFix.lat, lng:S.mission.lastFix.lng} : {...S.home}; pos = {...sim, acc:5, t:Date.now(), sim:true}; } }
+  else if (S.home) startGPS();
+  render();
+}
+const qs = new URLSearchParams(location.search).get('steps');   // lets a phone shortcut pass today's steps in the link
+if (qs && /^\d{1,6}$/.test(qs) && S.home) logSteps(+qs);
+boot();
+window.__lwb = {get S(){ return S; }, newDay, render};
+})();
+</script>
+</body></html>
