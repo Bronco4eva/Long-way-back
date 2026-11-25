@@ -403,18 +403,29 @@ function locHelp(open){
       <li>Step outside or near a window. GPS is weak indoors.</li>
       <li>Close the tab, open the link again, and tap Allow when asked.</li></ol></details></div>`;
 }
+let gpsSince = 0, lastFixAt = 0, gpsWhy = '';
+function gpsOk(p){ geoError = ''; geoBlocked = false; gpsWhy = ''; lastFixAt = Date.now(); onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); }
+function gpsErr(e){
+  if (e.code === 1){ geoBlocked = true; geoError = 'Location is blocked for this page. Follow the steps below to allow it, or try practice mode.'; wantHome = 0; stopGPS(); }
+  else { gpsWhy = e.code === 3 ? 'timed out' : 'no signal'; if (!pos) geoError = 'Still looking for a GPS signal. Step outside if you can.'; }
+  render();
+}
 function startGPS(){
   if (practice || watchId !== null) return;
   if (!('geolocation' in navigator)){ geoError = 'This browser has no location service.'; render(); return; }
-  watchId = navigator.geolocation.watchPosition(
-    p => { geoError = ''; geoBlocked = false; onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); },
-    e => {
-      if (e.code === 1){ geoBlocked = true; geoError = 'Location is blocked for this page. Follow the steps below to allow it, or try practice mode.'; wantHome = 0; stopGPS(); }
-      else if (!pos) geoError = 'Still looking for a GPS signal. Step outside if you can.';
-      render();
-    },
-    {enableHighAccuracy:true, maximumAge:5000, timeout:30000});
+  gpsSince = Date.now();
+  watchId = navigator.geolocation.watchPosition(gpsOk, gpsErr, {enableHighAccuracy:true, maximumAge:5000, timeout:30000});
+  // a quick rough fix from Wi-Fi or cell towers, so the screen is not stuck while the precise GPS warms up
+  navigator.geolocation.getCurrentPosition(p => { if (!lastFixAt) gpsOk(p); }, () => {}, {enableHighAccuracy:false, maximumAge:60000, timeout:15000});
 }
+function restartGPS(){ if (practice) return; stopGPS(); lastFixAt = 0; startGPS(); }
+// phones often drop the location feed when the screen locks or the browser goes to the background
+setInterval(() => {
+  if (practice || document.hidden || geoBlocked || watchId === null) return;
+  if (!(S.mission || wantHome)) return;
+  if (Date.now() - Math.max(lastFixAt, gpsSince) > 25000) restartGPS();
+  const b = $('gpsRetry'); if (b) b.hidden = !!pos && Date.now() - lastFixAt < 20000;
+}, 5000);
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
 function onFix(fix){
   pos = fix;
@@ -444,7 +455,7 @@ function onFix(fix){
 function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch {} }
 let wake = null;
 async function keepAwake(){ try { wake = await navigator.wakeLock.request('screen'); } catch {} }
-document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); render(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); if (S.home && !geoBlocked) restartGPS(); render(); } });
 
 /* ---------- destinations: real parks when the map service answers ---------- */
 let tried = [], scouting = false;
@@ -682,7 +693,7 @@ function updateCompass(){
   btn.hidden = compassOn || !needsCompassTap() || !!compassNote;
   if (heading == null || !pos){
     box.classList.remove('live');
-    line.textContent = compassNote || (!compassOn ? (needsCompassTap() ? 'Tap the button and the arrow will point the way as you turn.' : '') : heading == null ? (Date.now() - compassSince > 3000 ? (compassRefused ? 'Compass access was refused. Close this tab and open the game again to be asked once more.' : 'No compass reading from this phone. Use the map sketch below.') : 'Starting the compass…') : 'Waiting for GPS.');
+    line.textContent = compassNote || (!compassOn ? (needsCompassTap() ? 'Tap the button and the arrow will point the way as you turn.' : '') : heading == null ? (Date.now() - compassSince > 3000 ? (compassRefused ? 'Compass access was refused. Close this tab and open the game again to be asked once more.' : 'No compass reading from this phone. Use the map sketch below.') : 'Starting the compass…') : 'The arrow will work once your location is found.');
     return;
   }
   const tg = m.phase === 'out' ? m.site : S.home, rel = ((bearing(pos, tg) - heading) % 360 + 360) % 360;
@@ -717,7 +728,7 @@ function render(){
     if (!last) new Image().src = 'art/' + INTRO[introStep + 1].img + '.jpg';
     $('begin').onclick = () => {
       if (!last){ introStep++; render(); window.scrollTo(0, 0); return; }
-      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a place by the fire, a blanket, and nothing else.'); save(); render(); window.scrollTo(0, 0);
+      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a place by the fire, a blanket, and nothing else.'); save(); startGPS(); render(); window.scrollTo(0, 0);
     };
     if (introStep) $('introBack').onclick = () => { introStep--; render(); window.scrollTo(0, 0); };
   } else if (!S.home){
@@ -763,7 +774,9 @@ function render(){
         ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Walking directions</a>'}
         <button class="quiet" id="abandon">Turn back</button>
       </div>
-      <p class="small muted" id="gpsLine"></p>`;
+      <p class="small muted" id="gpsLine"></p>
+      ${practice ? '' : '<button class="quiet" id="gpsRetry" hidden>Location seems stuck. Tap to retry</button>'}`;
+    if ($('gpsRetry')) $('gpsRetry').onclick = () => { restartGPS(); $('gpsRetry').hidden = true; };
     abandonArmed = false;
     $('abandon').onclick = () => {
       if (!abandonArmed){ abandonArmed = true; $('abandon').textContent = 'Tap again to give up the task'; return; }
@@ -818,7 +831,7 @@ function tick(){
     $('dBig').textContent = fmtDist(dist(pos, tg));
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
-  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Waiting for GPS.'; }
+  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Finding your location. This can take up to a minute, and works best outdoors.'; }
   updateCompass();
   $('sWalk').textContent = fmtDist(m.meters);
   $('sTime').textContent = fmtTime(Date.now() - m.t0);
@@ -962,7 +975,7 @@ function fillPrivacy(){ const e = $('privJournal'); if (e) e.innerHTML = '<div c
 function boot(){ fillPrivacy();
   if (S.home) newDay();
   if (practice){ if (S.home){ sim = S.mission && S.mission.lastFix ? {lat:S.mission.lastFix.lat, lng:S.mission.lastFix.lng} : {...S.home}; pos = {...sim, acc:5, t:Date.now(), sim:true}; } }
-  else if (S.home) startGPS();
+  else if (S.intro) startGPS();
   render();
 }
 const qs = new URLSearchParams(location.search).get('steps');   // lets a phone shortcut pass today's steps in the link
