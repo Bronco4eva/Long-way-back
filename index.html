@@ -403,30 +403,42 @@ function locHelp(open){
       <li>Step outside or near a window. GPS is weak indoors.</li>
       <li>Close the tab, open the link again, and tap Allow when asked.</li></ol></details></div>`;
 }
-let gpsSince = 0, lastFixAt = 0, gpsWhy = '';
-function gpsOk(p){ geoError = ''; geoBlocked = false; gpsWhy = ''; lastFixAt = Date.now(); onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); }
+let gpsSince = 0, lastFixAt = 0, gpsWhy = '', gpsPerm = '', gpsPolls = 0, gpsFixes = 0, lastKick = 0;
+function gpsOk(p){ geoError = ''; geoBlocked = false; gpsWhy = ''; lastFixAt = Date.now(); gpsFixes++; onFix({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy || 50, t:Date.now()}); }
 function gpsErr(e){
   if (e.code === 1){ geoBlocked = true; geoError = 'Location is blocked for this page. Follow the steps below to allow it, or try practice mode.'; wantHome = 0; stopGPS(); }
   else { gpsWhy = e.code === 3 ? 'timed out' : 'no signal'; if (!pos) geoError = 'Still looking for a GPS signal. Step outside if you can.'; }
   render();
 }
+function gpsPoll(high){
+  gpsPolls++;
+  navigator.geolocation.getCurrentPosition(gpsOk, e => { if (e.code === 1) gpsErr(e); else gpsWhy = e.code === 3 ? 'timed out' : 'no signal'; }, {enableHighAccuracy:!!high, maximumAge:high ? 5000 : 60000, timeout:12000});
+}
+function checkPerm(){ try { navigator.permissions.query({name:'geolocation'}).then(r => { gpsPerm = r.state; r.onchange = () => { gpsPerm = r.state; }; }).catch(() => {}); } catch {} }
 function startGPS(){
   if (practice || watchId !== null) return;
   if (!('geolocation' in navigator)){ geoError = 'This browser has no location service.'; render(); return; }
-  gpsSince = Date.now();
+  gpsSince = Date.now(); checkPerm();
   watchId = navigator.geolocation.watchPosition(gpsOk, gpsErr, {enableHighAccuracy:true, maximumAge:5000, timeout:30000});
-  // a quick rough fix from Wi-Fi or cell towers, so the screen is not stuck while the precise GPS warms up
-  navigator.geolocation.getCurrentPosition(p => { if (!lastFixAt) gpsOk(p); }, () => {}, {enableHighAccuracy:false, maximumAge:60000, timeout:15000});
+  gpsPoll(false);  // a quick rough fix from Wi-Fi or cell towers while the precise GPS warms up
 }
-function restartGPS(){ if (practice) return; stopGPS(); lastFixAt = 0; startGPS(); }
-// phones often drop the location feed when the screen locks or the browser goes to the background
+function restartGPS(){ if (practice) return; stopGPS(); startGPS(); }
+const gpsStale = () => !pos || Date.now() - lastFixAt > 20000;
+// iPhones can ignore a location request that was not started by a tap, and phones drop the feed when the
+// screen locks. So: any tap while there is no fresh fix asks again, and a timer keeps polling in between.
+function kickGPS(){
+  if (practice || geoBlocked || !S.intro || !gpsStale() || Date.now() - lastKick < 4000) return;
+  lastKick = Date.now(); restartGPS();
+}
+document.addEventListener('click', kickGPS, true);
 setInterval(() => { if (wantHome && !S.home) tick(); }, 2000);
 setInterval(() => {
-  if (practice || document.hidden || geoBlocked || watchId === null) return;
-  if (!(S.mission || wantHome)) return;
-  if (Date.now() - Math.max(lastFixAt, gpsSince) > 25000) restartGPS();
-  const b = $('gpsRetry'); if (b) b.hidden = !!pos && Date.now() - lastFixAt < 20000;
-}, 5000);
+  if (practice || document.hidden || geoBlocked || watchId === null || !(S.mission || wantHome)) return;
+  if (gpsStale()) gpsPoll(gpsPolls % 2 === 1);
+  const b = $('gpsRetry'); if (b) b.hidden = !gpsStale() || Date.now() - gpsSince < 6000;
+  const d = $('gpsDiag'); if (d) d.textContent = gpsStale() && Date.now() - gpsSince > 6000 ? gpsDiag() : '';
+}, 4000);
+const gpsDiag = () => `Location check: permission ${gpsPerm || 'unknown'}, ${gpsFixes} readings, ${gpsPolls} tries${gpsWhy ? ', last result ' + gpsWhy : ', no answer from the phone yet'}.`;
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
 function onFix(fix){
   pos = fix;
@@ -735,7 +747,7 @@ function render(){
   } else if (!S.home){
     el.innerHTML = `${pic('village', 'scene', 'Hollow Ash at dusk')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
       <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
-      ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p><button id="useRough" hidden>Use this rough spot anyway</button>' : ''}
+      ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p><button id="useRough" hidden>Use this rough spot anyway</button><p class="small muted" id="gpsDiag"></p>' : ''}
       ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
       ${!practice && !wantHome && !geoError ? '<p class="small muted">Your phone will ask to share your location. Tap <b>Allow</b>.</p>' : ''}
       ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
@@ -776,8 +788,8 @@ function render(){
         <button class="quiet" id="abandon">Turn back</button>
       </div>
       <p class="small muted" id="gpsLine"></p>
-      ${practice ? '' : '<button class="quiet" id="gpsRetry" hidden>Location seems stuck. Tap to retry</button>'}`;
-    if ($('gpsRetry')) $('gpsRetry').onclick = () => { restartGPS(); $('gpsRetry').hidden = true; };
+      ${practice ? '' : '<button class="primary" id="gpsRetry" hidden>Tap to find my location</button><p class="small muted" id="gpsDiag"></p>'}`;
+    if ($('gpsRetry')) $('gpsRetry').onclick = () => { lastKick = Date.now(); restartGPS(); gpsPoll(true); $('gpsRetry').hidden = true; };
     abandonArmed = false;
     $('abandon').onclick = () => {
       if (!abandonArmed){ abandonArmed = true; $('abandon').textContent = 'Tap again to give up the task'; return; }
@@ -842,7 +854,7 @@ function tick(){
     $('dBig').textContent = fmtDist(dist(pos, tg));
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : pos.acc > 100 ? 'Your phone only knows where you are to within ' + Math.round(pos.acc) + ' m, which is too rough to count this walk. It usually sharpens once you are outside and moving.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
-  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Finding your location. This can take up to a minute, and works best outdoors.'; }
+  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Finding your location. Tap anywhere on the screen if this does not clear in a few seconds.'; }
   updateCompass();
   $('sWalk').textContent = fmtDist(m.meters);
   $('sTime').textContent = fmtTime(Date.now() - m.t0);
