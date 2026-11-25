@@ -420,6 +420,7 @@ function startGPS(){
 }
 function restartGPS(){ if (practice) return; stopGPS(); lastFixAt = 0; startGPS(); }
 // phones often drop the location feed when the screen locks or the browser goes to the background
+setInterval(() => { if (wantHome && !S.home) tick(); }, 2000);
 setInterval(() => {
   if (practice || document.hidden || geoBlocked || watchId === null) return;
   if (!(S.mission || wantHome)) return;
@@ -429,7 +430,7 @@ setInterval(() => {
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
 function onFix(fix){
   pos = fix;
-  if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 12000 && fix.acc <= 150))){
+  if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 6000 && fix.acc <= 150))){
     S.home = {lat:fix.lat, lng:fix.lng}; S.offer = null; wantHome = 0; newDay(); render(); return;
   }
   const m = S.mission;
@@ -734,7 +735,7 @@ function render(){
   } else if (!S.home){
     el.innerHTML = `${pic('village', 'scene', 'Hollow Ash at dusk')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
       <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
-      ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p>' : ''}
+      ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p><button id="useRough" hidden>Use this rough spot anyway</button>' : ''}
       ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
       ${!practice && !wantHome && !geoError ? '<p class="small muted">Your phone will ask to share your location. Tap <b>Allow</b>.</p>' : ''}
       ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
@@ -817,7 +818,17 @@ function render(){
 }
 function tick(){
   const m = S.mission;
-  if (!m){ if ($('gpsLine') && wantHome && pos) $('gpsLine').textContent = 'Finding you… accuracy ±' + Math.round(pos.acc) + ' m'; return; }
+  if (!m){
+    if ($('gpsLine') && wantHome){
+      const waited = Date.now() - wantHome, far = a => a >= 1000 ? (a / 1000).toFixed(1) + ' km' : Math.round(a) + ' m';
+      if (pos){
+        const rough = pos.acc > 150;
+        $('gpsLine').textContent = 'Finding you… your phone says it knows where you are to within ' + far(pos.acc) + '.' + (rough && waited > 8000 ? ' That is too rough to play well. Go outside or stand by a window, make sure Wi-Fi is on, and on iPhone check that Precise Location is on for your browser.' : '');
+        const u = $('useRough'); if (u){ u.hidden = !(rough && waited > 8000); u.onclick = () => { S.home = {lat:pos.lat, lng:pos.lng}; S.offer = null; wantHome = 0; newDay(); note('You marked camp from a rough location. Move home base from the Journal tab once you have a better signal.'); render(); }; }
+      } else if (waited > 12000) $('gpsLine').textContent = 'Still no location from your phone' + (gpsWhy ? ' (' + gpsWhy + ')' : '') + '. Check that Location is on for the phone itself, turn Wi-Fi on, and step outside. The game keeps trying.';
+    }
+    return;
+  }
   if (m.phase === 'battle'){
     if (m.bt0 && $('btime')){
       const left = BATTLE_SECS * 1000 - (Date.now() - m.bt0);
@@ -830,7 +841,7 @@ function tick(){
   if (pos){
     $('dBig').textContent = fmtDist(dist(pos, tg));
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
-    $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
+    $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : pos.acc > 100 ? 'Your phone only knows where you are to within ' + Math.round(pos.acc) + ' m, which is too rough to count this walk. It usually sharpens once you are outside and moving.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
   } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Finding your location. This can take up to a minute, and works best outdoors.'; }
   updateCompass();
   $('sWalk').textContent = fmtDist(m.meters);
