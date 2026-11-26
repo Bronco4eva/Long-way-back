@@ -531,7 +531,7 @@ function onFix(fix){
 function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch {} }
 let wake = null;
 async function keepAwake(){ try { wake = await navigator.wakeLock.request('screen'); } catch {} }
-document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); if (S.home && !geoBlocked) restartGPS(); render(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); if (S.home && !geoBlocked) restartGPS(); wantRoute(); render(); } });
 
 /* ---------- destinations: real parks when the map service answers ---------- */
 let tried = [], scouting = false;
@@ -566,7 +566,7 @@ async function findPark(oneWay){
 // Walking route along real paths, from the public OpenStreetMap routing service. The start is rounded to about a
 // block so the exact home spot is not sent. Returns null on any failure; the map then falls back to a straight line.
 async function fetchRoute(a, b){
-  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 9000);
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 15000);
   try {
     const r = await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng.toFixed(3)},${a.lat.toFixed(3)};${b.lng.toFixed(5)},${b.lat.toFixed(5)}?overview=full&geometries=geojson`, {signal:ctl.signal});
     if (!r.ok) return null;
@@ -576,12 +576,28 @@ async function fetchRoute(a, b){
     return pts.length > 1 ? {pts, m:rt.distance} : null;
   } catch { return null; } finally { clearTimeout(to); }
 }
+let routeTry = {k:'', n:0, t:0}, routeBusy = false;
 async function addRoute(o){
-  if (practice || !o) return;
-  const rt = await fetchRoute(S.home, o.site);
-  if (!rt || (S.offer !== o && S.mission !== o)) return;
-  o.route = rt.pts; o.routeM = rt.m; save(); render();
+  if (practice || !o || !S.home || routeBusy) return;
+  const k = ptKey(o.site);
+  if (routeTry.k !== k) routeTry = {k, n:0, t:0};
+  routeTry.n++; routeTry.t = Date.now(); routeBusy = true;
+  const rt = await fetchRoute(S.home, o.site); routeBusy = false;
+  if (!rt) return;
+  // Match by place, not by object: the offer becomes a new mission object when you set out, and a reload rebuilds both.
+  let hit = false;
+  [S.offer, S.mission].forEach(x => { if (x && !x.route && ptKey(x.site) === k){ x.route = rt.pts; x.routeM = rt.m; hit = true; } });
+  if (hit){ save(); render(); }
 }
+// Keep asking for the walking path until it arrives (weak signal, a reload, or setting out before it loaded), backing off each time.
+function wantRoute(){
+  const o = S.mission || S.offer;
+  if (practice || !o || o.route || routeBusy || navigator.onLine === false) return;
+  const same = routeTry.k === ptKey(o.site), n = same ? routeTry.n : 0;
+  if (n >= 8 || (same && Date.now() - routeTry.t < Math.min(120000, 8000 * 2 ** n))) return;
+  addRoute(o);
+}
+setInterval(wantRoute, 3000);
 // Places stay where you found them: once you have reached a spot it is saved under its kind (spring, grove, far grove...)
 // and every later task of that kind sends you back to the same ground.
 const places = () => S.places || (S.places = {});
@@ -974,7 +990,7 @@ function render(){
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
-      ${radarBox((m.route ? 'Blue dots are the walking path. ' : 'The dashed line is the straight direction. ') + 'The ringed dot is you, and green marks where you have walked.')}
+      ${radarBox((m.route ? 'Blue dots are the walking path. ' : 'The dashed line is the straight direction until the walking path loads. ') + 'The ringed dot is you, and green marks where you have walked.')}
       <div class="stats"><div><b id="sWalk">0</b><span class="small muted">on foot</span></div><div><b id="sTime">0:00</b><span class="small muted">time</span></div><div><b id="sSteps">0</b><span class="small muted">steps (est.)</span></div></div>
       <div class="row">
         ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Open in Google Maps</a>'}
