@@ -46,6 +46,16 @@ p{margin:0}
 .panel{background:var(--surface);border:2px solid var(--line);border-radius:4px;padding:1rem;display:flex;flex-direction:column;gap:.9rem}
 .scene{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:2px solid var(--line);border-radius:4px;background:var(--raised)}
 .scene.strip{aspect-ratio:3/1}
+.vmap{position:relative;display:block}
+.vmap .pin{position:absolute;width:44px;height:44px;min-height:0;padding:0;border:0;background:none;transform:translate(-50%,-50%);display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
+.pin i{display:block;width:15px;height:15px;transform:rotate(45deg);background:var(--muted);border:2px solid #0D1215;box-shadow:0 0 0 2px rgba(228,233,236,.85)}
+.pin.bad i{background:var(--warn)} .pin.ok i{background:var(--moss)} .pin.odd i{background:var(--water)}
+.pin.go i{background:var(--ember);animation:pinpulse 1.2s steps(2) infinite}
+.pin[aria-pressed="true"] i{width:21px;height:21px;box-shadow:0 0 0 3px #fff}
+@keyframes pinpulse{50%{box-shadow:0 0 0 5px rgba(255,138,76,.9)}}
+@media (prefers-reduced-motion:reduce){.pin.go i{animation:none}}
+.key{display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin:.5rem 0 0;font-size:.8125rem;color:var(--muted)} .key i{display:inline-block;width:9px;height:9px;transform:rotate(45deg);margin-right:.45rem}
+.scene.zoom{background-repeat:no-repeat;background-size:230%}
 .face{width:72px;height:72px;flex:none;border:2px solid var(--line);border-radius:4px;object-fit:cover;background:var(--raised)}
 .face.sm{width:44px;height:44px}
 .big{font-size:4.25rem;color:var(--ember)}
@@ -141,9 +151,11 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   </div>
 
   <div class="gut screen" data-tab="camp" hidden>
-    <span id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
     <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
-    <section class="panel" id="insideBox"></section>
+    <div><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
+      <p class="key" aria-hidden="true"><span><i style="background:var(--ember)"></i>You can fix this now</span><span><i style="background:var(--warn)"></i>Something is wrong here</span><span><i style="background:var(--moss)"></i>All is well</span></p>
+      <p class="small muted" style="margin:.4rem 0 0">Tap a place in the picture to walk over and see what is wrong there.</p></div>
+    <section class="panel" id="spotBox"></section>
     <section>
       <p class="eyebrow">The known world</p>
       <canvas id="world" aria-label="Map of camp and the places you have found" style="margin-top:.5rem"></canvas>
@@ -291,13 +303,45 @@ const TASKS = {
   rescue:  {g:'maren',  t:'Bring them back from the stockade', d:'', res:'captive', km:3.2, tr:0, battle:'foe', rescue:true}
 };
 const POOLS = [['water','softfood','race'], ['firewood','reeds','bark','stone'], ['snare','grove']];
+// Everything the camp can build, in the order the village picture grows. Each one is a problem at a spot in that picture,
+// with a villager who suffers until it is fixed. Built in order, so the picture always shows what is really there.
+// The loom is the one side job: it can be built at any time and does not change the picture.
 const BUILDS = [
-  {k:'ring',    name:'Fire ring',   perk:'A proper hearth. You may sit closer.', cost:{stone:5}},
-  {k:'loom',    name:"Oona's loom", perk:'Lets Oona weave. She can make you a sling, then a pack.', cost:{wood:8, fiber:6}},
-  {k:'leanto',  name:'Lean-to',     perk:'A roof of your own against the longhouse wall.', cost:{wood:12, fiber:4}},
-  {k:'cistern', name:'Rain cistern',perk:'The camp uses one less water each day.', cost:{stone:8, water:10}},
-  {k:'smoke',   name:'Smokehouse',  perk:'The camp uses one less food each day.', cost:{wood:15, stone:10, food:10}},
-  {k:'wall',    name:'Palisade',    perk:'Walls. The first night anyone sleeps soundly.', cost:{wood:30, stone:10}}
+  {k:'loom', side:true, spot:'house', who:'oona', name:"Oona's loom", cost:{wood:8, fiber:6}, perk:'Lets Oona weave. She can make you a sling, then a pack.',
+   bad:'There is no loom. The last one burned with the river town.', hurt:'Oona twists cord by hand until her fingers split, and it is never enough.', good:"Oona's loom stands by the longhouse wall. She ran her hand along the beam and told you to hold still while she measured you."},
+  {k:'ring', spot:'yard', who:'maren', name:'Fire ring and lean-to', cost:{stone:5, wood:4}, perk:'A proper hearth and a dry woodpile. You may sit closer.',
+   bad:'The fire burns on bare ground, and the wood for it lies out in the rain.', hurt:'Maren sits up over it every night. She has seen what a loose fire does to a town.', good:'A ring of stone round the fire and a lean-to for the wood. Maren was asleep before midnight.'},
+  {k:'fence', spot:'yard', who:'dack', name:'Wattle fence', cost:{wood:8, fiber:4}, perk:'A fence and a gate round the yard. Dack stops pacing.',
+   bad:'Nothing stands between the sleepers and the dark.', hurt:'Dack walks the edge of the firelight all night with his bow strung.', good:'A woven fence round the yard, with a gate that shuts. Dack unstrung his bow and sat down by the fire.'},
+  {k:'granary', spot:'yard', who:'isla', name:'Granary and fish traps', cost:{wood:10, fiber:5}, perk:'The camp uses one less food each day.',
+   bad:'The food sits in sacks on the ground, and the mice take their share first.', hurt:"Isla picks through every handful so that Wren's is clean, and eats what is left.", good:'A granary on stilts in the yard and reed traps set in the stream. Isla ate a whole bowl and did not look at it first.'},
+  {k:'well', spot:'yard', who:'tobiah', name:'Well', cost:{stone:8, wood:3}, perk:'The camp uses one less water each day.',
+   bad:'Every drop of water is carried up the bank from the stream.', hurt:'Tobiah does it on his bad knee when he thinks nobody is looking.', good:'A well in the yard, stone-lined, with water an arm down. Tobiah drew the first bucket himself and pretended it was nothing.'},
+  {k:'weave', spot:'mound', who:'oona', name:'Weaving house and vegetable plot', cost:{wood:10, fiber:8}, perk:'Oona works under a roof at last. You carry 3 more a trip.',
+   bad:'Oona works out in the open, and the damp gets into every thread before it is cloth.', hurt:'Half of what she makes rots, and she unpicks it at night so nobody sees.', good:'A weaving house dug warm into the mound, and a fenced plot of greens below it. Oona hung her first dry cloth on your shoulder.'},
+  {k:'smithy', spot:'stream', who:'dack', name:'Smithy', cost:{wood:12, stone:12}, perk:'Sharp tools. Every trip brings home 1 more.',
+   bad:'Every blade in camp is blunt, and there is no fire hot enough to mend one.', hurt:'Dack cuts the firewood with a notched axe. It takes him twice as long and he will not say so.', good:'A smithy by the bridge, with a forge that roars. Dack put an edge on every blade in camp and then on yours.'},
+  {k:'fields', spot:'fields', who:'pip', name:'Barley, pens and two more longhouses', cost:{wood:20, fiber:8, food:6}, perk:'The camp grows its own. It uses one less food each day.',
+   bad:'Eleven people sleep in one room and eat only what you carry in.', hurt:'Pip gives his place by the wall to whoever is coughing, and sleeps by the door.', good:'Barley in the west fields, sheep in the pens and two new roofs on the hill. Pip has a bed that is his, and has told everyone.'},
+  {k:'stable', spot:'stream', who:'tobiah', name:'Stable, fishing hut and tannery', cost:{wood:20, stone:12, fiber:6}, perk:'Good leather and proper straps. You carry 5 more a trip.',
+   bad:'Hides rot before they can be cured, fish are caught by hand, and there is nowhere to keep an animal.', hurt:'Tobiah patches the same boots every week with cord, because there is no leather.', good:'A stable in the old ruins with its yard open to the road, a fishing hut on the bend and hides curing by the water. Tobiah made you a strap that does not cut.'},
+  {k:'road', spot:'ruins', who:'maren', name:'Pave the road in stone', the:'the stone road', cost:{stone:30}, perk:'Maren owes you rest. One more rest day banked.',
+   bad:'The old road is mud to the ankle from the bridge to the arch.', hurt:'Maren hauls every cart through it herself, because she will not ask anyone else to.', good:'The road is stone again from the bridge to the arch, the way whoever built it meant. Maren walked it once in dry boots and told you to take a day.'},
+  {k:'walls', spot:'ruins', who:'dack', name:'Timber wall and watchtower', cost:{wood:30, stone:10}, perk:'The Tallymen need a day longer before they dare come.',
+   bad:'Anyone can walk in through the old arch, and the Tallymen know it.', hurt:'Dack sleeps sitting up in the gap, so they would have to step over him.', good:'A timber wall across the gap, a gate, and a watchtower on the rock. Dack climbed it at dusk and stayed up there, smiling at nothing.'},
+  {k:'stone', spot:'ruins', who:'maren', name:'Rebuild Hollow Ash in stone', the:'the rebuilding in stone', cost:{stone:40, wood:20}, perk:'Hollow Ash will stand. The first night anyone sleeps soundly.',
+   bad:'Thatch burns and timber rots. Everything here could be gone in one bad night.', hurt:'Maren has watched one town burn. She counts the roofs here every evening.', good:'Stone walls, slate roofs and a tower on the rock. Hollow Ash is a town again. Maren stopped counting the roofs.'}
+];
+const STAGED = BUILDS.filter(b => !b.side);
+// The places you can tap in the village picture. at = where the marker sits, as a percent of the picture.
+const SPOTS = [
+  {k:'house',  name:'The longhouse', at:[41, 42], d:'The one roof in Hollow Ash. Everyone sleeps under it.'},
+  {k:'yard',   name:'The yard',      at:[53, 60], d:'The ground in front of the longhouse, where the fire is and where everyone ends up.'},
+  {k:'mound',  name:'The mound',     at:[24, 43], d:'A low green rise across from the longhouse, dry inside and out of the wind.'},
+  {k:'stream', name:'The stream',    at:[54, 81], d:'Cold, fast and full of fish, with an old stone bridge nobody here built.'},
+  {k:'fields', name:'The west fields', at:[13, 70], d:'Open grass on the far bank, running up to the hill. Good ground with nothing on it.'},
+  {k:'ruins',  name:'The ruins',     at:[77, 48], d:'An arch and some broken walls from whoever was here first. The road runs out through it.'},
+  {k:'mine',   name:'The old mine',  at:[30, 19], d:'A hole in the hillside, older than the ruins. There are tally marks cut into the lintel, and Tobiah says they count down. Nobody in camp will go in, and nobody will tell you why.'}
 ];
 // The inside of the longhouse. Mended in this order, roof first; each one has a villager who suffers until it is done.
 const REPAIRS = [
@@ -414,10 +458,16 @@ const saveKey = () => practice ? 'lwb-save-practice' : 'lwb-save';
 const today = () => new Date().toLocaleDateString('en-CA');
 const blank = () => ({intro:false, home:null, first:today(), seen:today(),
   trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
-  stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{},
+  stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{}, v:2,
   board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
   journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}});
-function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return Object.assign(blank(), j); } catch {} return blank(); }
+// Saves from before the build list followed the picture: keep the loom, and carry over the count of other things built.
+function migrate(j){
+  if (j.v >= 2) return j;
+  const old = j.built || {}, n = ['ring', 'leanto', 'cistern', 'smoke', 'wall'].filter(k => old[k]).length;
+  j.built = old.loom ? {loom:true} : {}; STAGED.slice(0, n).forEach(b => j.built[b.k] = true); j.v = 2; return j;
+}
+function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return migrate(Object.assign(blank(), j, {v:j.v || 1})); } catch {} return blank(); }
 let S = load();
 const save = () => store.set(saveKey(), JSON.stringify(S));
 
@@ -456,7 +506,7 @@ const items = () => S.items || (S.items = []);
 const visits = () => S.visits || (S.visits = {});
 const kit = f => items().map(item).filter(i => i && f(i));
 const gear = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
-const carry = () => gear() + (perks().back || 0) + kit(i => i.carry).reduce((n, i) => n + i.carry, 0);
+const carry = () => gear() + (S.built.weave ? 3 : 0) + (S.built.stable ? 5 : 0) + (perks().back || 0) + kit(i => i.carry).reduce((n, i) => n + i.carry, 0);
 const attrLvl = a => { const v = a.val(); let i = 0; while (i < a.steps.length - 1 && v >= a.steps[i + 1]) i++; return i + 1; };
 const xp = () => Math.round(S.stats.tasks * 10 + S.stats.meters / 100 + (S.stats.reps || 0) / 2 + S.stats.wins * 15 + frags().length * 5 + items().length * 8 + REPAIRS.filter(r => S.fixed[r.k]).length * 10);
 const lvlAt = n => 30 * n * (n - 1);
@@ -464,12 +514,36 @@ const level = () => { const x = xp(); let n = 1; while (x >= lvlAt(n + 1)) n++; 
 const points = () => level() - 1 - PERKS.reduce((t, k) => t + (perks()[k.k] || 0), 0);
 // Which village picture to show. Each thing built, and the longhouse repairs at two and at four, moves it on one stage.
 const STAGE_ALT = ['', 'a run-down longhouse and one fire', 'a fire ring and a lean-to by the longhouse', 'a wattle fence round the yard', 'a granary and fish traps by the stream', 'the longhouse mended, with a well', 'a weaving house and a vegetable plot', 'a smithy by the stream', 'more longhouses, animal pens and barley', 'a full village', 'the road paved in stone', 'a full village behind timber defenses', 'the village rebuilt in stone'];
-const villageStage = () => { const fx = REPAIRS.filter(r => S.fixed[r.k]).length, n = BUILDS.filter(b => S.built[b.k]).length + (fx >= 2 ? 1 : 0) + (fx >= 4 ? 1 : 0); return n >= 8 ? 11 : n + 1; };
+const villageStage = () => { let n = 0; while (n < STAGED.length && S.built[STAGED[n].k]) n++; return n + 1; };
+const nextBuild = () => STAGED[villageStage() - 1];
+const mended = () => REPAIRS.every(r => S.fixed[r.k]);
+const canPay = cost => Object.entries(cost).every(([k, v]) => S.stock[k] >= v);
+const costText = cost => Object.entries(cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', ');
+const theName = b => b.the || 'the ' + b.name.charAt(0).toLowerCase() + b.name.slice(1);
+// Why a thing cannot be built yet, or '' if it can (stores allowing).
+const blocked = b => S.built[b.k] || b.side ? '' : b !== nextBuild() ? 'Maren wants ' + theName(nextBuild()) + ' done first.' + (nextBuild().spot === b.spot ? '' : ' That is over at ' + SPOTS.find(s => s.k === nextBuild().spot).name.toLowerCase() + '.') : b.k === 'well' && !mended() ? 'Maren will not dig a well beside a house with no roof. Mend the inside of the longhouse first.' : '';
+const spotJobs = k => BUILDS.filter(b => b.spot === k);
+// What a spot's marker shows: 'go' something here can be paid for now, 'bad' problems wait here, 'ok' all is well, 'odd' the mine.
+const spotState = k => { if (k === 'mine') return 'odd';
+  const open = spotJobs(k).filter(b => !S.built[b.k]), rep = k === 'house' ? REPAIRS.find(r => !S.fixed[r.k]) : null;
+  if (open.some(b => !blocked(b) && canPay(b.cost)) || (rep && canPay(rep.cost))) return 'go';
+  return open.length || rep ? 'bad' : 'ok'; };
+function doBuild(b){
+  if (S.built[b.k] || blocked(b) || !canPay(b.cost)) return;
+  const before = {sleep:sleep(), carry:carry()};
+  Object.entries(b.cost).forEach(([k, v]) => S.stock[k] -= v); S.built[b.k] = true;
+  note(b.good); addTrust(b.who, b.k === 'loom' ? 2 : 1);
+  if (b.k === 'road') neglect().rests++;
+  if (b.k === 'stone') Object.keys(PEOPLE).forEach(k => addTrust(k, 1));
+  if (sleep() !== before.sleep) note('Tonight you sleep here: ' + sleep().toLowerCase() + '.');
+  if (carry() !== before.carry) note(b.k === 'loom' ? 'Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.' : 'You can carry ' + carry() + ' a trip now.');
+  newDay(); render();
+}
 const villagePic = cls => pic('village-' + villageStage(), cls, 'Hollow Ash at dusk: ' + STAGE_ALT[villageStage()]);
 const carryName = () => gear() === 20 ? "Oona's woven pack" : gear() === 10 ? "Oona's sling" : 'Your two hands';
-const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the longhouse, on a bench you built' : S.trust.maren >= 3 ? 'The longhouse floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
+const sleep = () => S.trust.maren >= 6 && S.built.ring ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the longhouse, on a bench you built' : S.trust.maren >= 3 ? 'The longhouse floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
 const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
-const needs = () => ({food:S.built.smoke ? 1 : 2, water:S.built.cistern ? 1 : 2, wood:1});
+const needs = () => ({food:2 - (S.built.granary ? 1 : 0) - (S.built.fields ? 1 : 0), water:S.built.well ? 1 : 2, wood:1});
 function note(text){ S.journal.unshift({d:today(), t:text}); S.journal = S.journal.slice(0, 30); }
 function addTrust(who, n){ S.trust[who] = Math.max(0, Math.min(10, S.trust[who] + n)); }
 
@@ -498,7 +572,7 @@ function neglectStep(stage, t){
 }
 function runNeglect(t){
   if (!S.home) return;
-  const N = neglect(), missed = dayDiff(helpBase(), t) - 1;
+  const N = neglect(), missed = dayDiff(helpBase(), t) - 1 - (S.built.walls ? 1 : 0);
   const want = missed >= 6 ? 4 : missed >= 4 ? 3 : missed >= 3 ? 2 : missed >= 2 ? 1 : 0;
   while (N.stage < want){ N.stage++; neglectStep(N.stage, t); }
 }
@@ -506,7 +580,7 @@ function campState(){
   const N = neglect(), t = today(), tk = takenList();
   if (N.lastHelp === t && S.stats.tasks) return {mood:'Safe', line:'You carried for the camp today. The ridge is empty.', warn:''};
   if (resting()) return {mood:'Resting', line:'Maren gave you leave. Nobody counts these days against you. Back to work after ' + new Date(N.restUntil + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) + '.', warn:''};
-  const m1 = dayDiff(helpBase(), t);
+  const m1 = dayDiff(helpBase(), t) - (S.built.walls ? 1 : 0);
   const next = m1 === 2 ? 'Tallymen scouts will be on the ridge by morning' : m1 === 3 ? 'the Tallymen will mark the longhouse door tonight' : m1 === 4 || m1 === 6 ? 'the Tallymen will come tonight and take someone' : '';
   const warn = next ? 'If you finish no task today, ' + next + '.' : '';
   if (N.stage >= 3) return {mood:'Raided', line:tk.length ? 'The Tallymen hold ' + names(tk) + '. The camp is quiet in the wrong way.' : 'The Tallymen have been through here. Everyone is back, and nobody sleeps well.', warn};
@@ -864,7 +938,7 @@ function unload(){
     note('You put the feverbark in Tobiah\'s hands with a day\'s walk still in your legs. By morning Wren was cool to the touch. Isla held your arm and did not let go for a while.');
     haul = 0;
   } else {
-    { const extra = kit(i => i.bonus && i.bonus[0] === T.res).reduce((n, i) => n + i.bonus[1], 0); if (extra){ haul += extra; notes.push('Your tools brought in ' + extra + ' more'); } }
+    { const extra = kit(i => i.bonus && i.bonus[0] === T.res).reduce((n, i) => n + i.bonus[1], 0) + (S.built.smithy ? 1 : 0); if (extra){ haul += extra; notes.push('Your tools brought in ' + extra + ' more'); } }
     S.stock[T.res] += haul; addTrust(T.g, tr);
   }
   let got = null;
@@ -902,7 +976,7 @@ function logSteps(n){
 
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
 let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
-let openTalk = '', talkBusy = false, talkErr = '';
+let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house';
 const aiOn = () => !!(sampleFn || apiKey);
 if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
 function aiErr(e){
@@ -1307,23 +1381,48 @@ function renderCamp(){
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
   $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small></div>`).join('');
-  { const done = REPAIRS.filter(r => S.fixed[r.k]).length, nextR = REPAIRS.find(r => !S.fixed[r.k]);
-    $('insideBox').innerHTML = `<p class="eyebrow">Inside the longhouse</p>${pic('inside-' + done, 'scene', done === REPAIRS.length ? 'Inside the longhouse, mended: a whole roof, closed shutters, a good fire and dry beds' : 'Inside the longhouse: cold, damp and in bad repair, with the survivors huddled in it')}
+  { const sp = SPOTS.find(s => s.k === openSpot) || SPOTS[0], stage = villageStage(), box = $('spotBox');
+    const face = who => pic('p-' + who, 'face sm');
+    const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. The Tallymen have ' + PEOPLE[who].name + '.' : hurt}</span>`;
+    const jobs = spotJobs(sp.k).map(b => {
+      if (S.built[b.k]) return `<li class="ok"><div class="thead">${face(b.who)}<div class="who"><h3>${b.name}</h3><span class="built">Built</span></div></div><p class="small">${b.good}</p><p class="cost">${b.perk}</p></li>`;
+      const why = blocked(b), can = canPay(b.cost);
+      return `<li><div class="thead">${face(b.who)}<div class="who"><h3>${b.name}</h3></div></div>
+        <p class="small">${b.bad} ${hurts(b.who, b.hurt)}</p><p class="cost">${b.perk} Needs ${costText(b.cost)} from the stores.</p>
+        ${why ? `<p class="small muted">${why}</p>` : `<button data-b="${b.k}" ${can ? 'class="primary"' : 'disabled'}>${can ? 'Build it' : 'Not enough in the stores yet'}</button>`}</li>`;
+    }).join('');
+    let h = `<p class="eyebrow">You walk over to</p><h2>${sp.name}</h2>`;
+    if (sp.k === 'house'){
+      const done = REPAIRS.filter(r => S.fixed[r.k]).length, nextR = REPAIRS.find(r => !S.fixed[r.k]);
+      h += `${pic('inside-' + done, 'scene', done === REPAIRS.length ? 'Inside the longhouse, mended: a whole roof, closed shutters, a good fire and dry beds' : 'Inside the longhouse: cold, damp and in bad repair, with the survivors huddled in it')}
       <p class="small">${done === REPAIRS.length ? 'Roof, shutters, hearth and beds are all mended. Nobody in here is cold tonight.' : done ? done + ' of ' + REPAIRS.length + ' mended. The rest still hurts someone every night.' : 'This is where they sleep. Everything in it is broken, and someone suffers for each broken thing until it is mended.'}</p>
       <ul class="mends">${REPAIRS.map(r => {
-        const P = PEOPLE[r.who], cost = Object.entries(r.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', '), can = Object.entries(r.cost).every(([k, v]) => S.stock[k] >= v);
-        if (S.fixed[r.k]) return `<li class="ok"><div class="thead">${pic('p-' + r.who, 'face sm')}<div class="who"><h3>${r.name}</h3><span class="built">Mended</span></div></div><p class="small">${r.good}</p></li>`;
-        return `<li><div class="thead">${pic('p-' + r.who, 'face sm')}<div class="who"><h3>${r.name}</h3></div></div>
-          <p class="small">${r.bad} <span class="hurt">${taken()[r.who] ? P.name + ' is not here to suffer it. The Tallymen have ' + P.name + '.' : r.hurt}</span></p><p class="cost">Needs ${cost} from the stores.</p>
+        const cost = costText(r.cost), can = canPay(r.cost);
+        if (S.fixed[r.k]) return `<li class="ok"><div class="thead">${face(r.who)}<div class="who"><h3>${r.name}</h3><span class="built">Mended</span></div></div><p class="small">${r.good}</p></li>`;
+        return `<li><div class="thead">${face(r.who)}<div class="who"><h3>${r.name}</h3></div></div>
+          <p class="small">${r.bad} ${hurts(r.who, r.hurt)}</p><p class="cost">Needs ${cost} from the stores.</p>
           ${r === nextR ? `<button data-fix="${r.k}" ${can ? 'class="primary"' : 'disabled'}>${can ? 'Mend it' : 'Not enough in the stores yet'}</button>` : `<p class="small muted">Maren wants the ${nextR.k === 'roof' ? 'roof' : nextR.k === 'beds' ? 'beds' : nextR.k} done first.</p>`}</li>`;
-      }).join('')}</ul>`;
-    $('insideBox').querySelectorAll('button[data-fix]').forEach(btn => btn.onclick = () => {
-      const r = REPAIRS.find(x => x.k === btn.dataset.fix); if (S.fixed[r.k] || !Object.entries(r.cost).every(([k, v]) => S.stock[k] >= v)) return;
+      }).join('')}${jobs}</ul>`;
+    } else {
+      const z = 2.3, at = a => Math.max(0, Math.min(100, (a * z - 50) / (z - 1))).toFixed(1), open = spotJobs(sp.k).filter(b => !S.built[b.k]).length;
+      h += `<div class="scene zoom" role="img" aria-label="${sp.name}, up close" style="background-image:url(art/village-${stage}.jpg);background-position:${at(sp.at[0])}% ${at(sp.at[1])}%"></div>
+      <p class="small">${sp.d}${sp.k === 'mine' ? (stage >= 12 ? ' Someone has hung a lantern at the mouth of it.' : '') : open ? '' : ' Nothing here is hurting anyone now.'}</p>${jobs ? `<ul class="mends">${jobs}</ul>` : ''}`;
+    }
+    box.innerHTML = h;
+    box.querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
+    box.querySelectorAll('button[data-fix]').forEach(btn => btn.onclick = () => {
+      const r = REPAIRS.find(x => x.k === btn.dataset.fix); if (S.fixed[r.k] || !canPay(r.cost)) return;
       Object.entries(r.cost).forEach(([k, v]) => S.stock[k] -= v); S.fixed[r.k] = true; addTrust(r.who, 1);
       note(r.good);
-      if (REPAIRS.every(x => S.fixed[x.k])){ addTrust('maren', 1); note('The longhouse is whole: roof, shutters, hearth and beds. Maren walked the length of it twice and then told you where you sleep tonight. Inside.'); }
+      if (mended()){ addTrust('maren', 1); note('The longhouse is whole: roof, shutters, hearth and beds. Maren walked the length of it twice and then told you where you sleep tonight. Inside.'); }
       newDay(); render();
-    }); }
+    });
+    const c = $('campPic'), key = stage + openSpot + SPOTS.map(s => spotState(s.k)[0]).join('');
+    if (c && c.dataset.st !== key){ c.dataset.st = key;
+      const word = {go:'you can fix something here now', bad:'something is wrong here', ok:'all is well', odd:'nobody goes in'};
+      c.innerHTML = villagePic('scene') + SPOTS.map(s => { const st = spotState(s.k); return `<button class="pin ${st}" data-spot="${s.k}" style="left:${s.at[0]}%;top:${s.at[1]}%" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}"><i></i></button>`; }).join('');
+      c.querySelectorAll('.pin').forEach(btn => btn.onclick = () => { openSpot = btn.dataset.spot; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); });
+    } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
     $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
         <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
@@ -1338,7 +1437,6 @@ function renderCamp(){
       perks()[k.k] = n + 1; if (k.k === 'rest') neglect().rests++;
       note('You took ' + k.name + (n ? ' again' : '') + '. ' + k.d.split(',')[0] + '.'); save(); render();
     });
-    { const c = $('campPic'), st = String(villageStage()); if (c && c.dataset.st !== st){ c.dataset.st = st; c.innerHTML = villagePic('scene'); } }
     $('loreLine').textContent = frags().length ? frags().length + ' of ' + FIND_TOTAL + ' found. Each place has its own, and you find one each time you reach it.' : 'Nothing yet. Each time you reach a place on a task, you find something left by whoever was here before. Nobody can read any of it.';
     $('lore').innerHTML = frags().map(i => `<li>${esc(findText(i))}</li>`).join(''); }
   $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
@@ -1367,11 +1465,10 @@ function renderCamp(){
   const n = needs();
   $('stock').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n[k] && S.stock[k] < n[k] * 2 ? 'low' : ''}"><div class="count">${S.stock[k]}</div><span class="small muted">${name}</span></div>`).join('');
   $('upkeep').textContent = `Each day the camp uses ${n.food} food, ${n.water} water and ${n.wood} firewood, whether you show up or not.`;
-  $('builds').innerHTML = BUILDS.map(b => {
-    const cost = Object.entries(b.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', ');
-    const can = Object.entries(b.cost).every(([k, v]) => S.stock[k] >= v);
-    return `<li><div><b>${b.name}</b><div class="small">${b.perk}</div><div class="cost">${cost}</div></div>` +
-      (S.built[b.k] ? '<span class="built">Built</span>' : `<button data-b="${b.k}" ${can ? '' : 'disabled'}>Help build</button>`) + '</li>';
+  $('builds').innerHTML = [...STAGED, ...BUILDS.filter(b => b.side)].map(b => {
+    const why = blocked(b), where = SPOTS.find(s => s.k === b.spot).name;
+    return `<li><div><b>${b.name}</b> <span class="tag">${where}</span><div class="small">${b.perk}</div><div class="cost">${costText(b.cost)}${why && b === nextBuild() ? '. ' + why : ''}</div></div>` +
+      (S.built[b.k] ? '<span class="built">Built</span>' : why ? `<span class="small muted" style="white-space:nowrap">${b === nextBuild() ? 'Not yet' : 'Later'}</span>` : `<button data-b="${b.k}" ${canPay(b.cost) ? '' : 'disabled'}>Help build</button>`) + '</li>';
   }).join('') + S.ideas.map((b, i) => {
     const cost = Object.entries(b.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', ');
     const can = Object.entries(b.cost).every(([k, v]) => S.stock[k] >= v);
@@ -1384,15 +1481,7 @@ function renderCamp(){
     note('It works. ' + b.name + ', made here with your hands from an idea you carried in your head. ' + PEOPLE[b.who].name + ' watched it work and said nothing for a long time.');
     newDay(); render();
   });
-  $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => {
-    const b = BUILDS.find(x => x.k === btn.dataset.b), before = {sleep:sleep(), carry:carry()};
-    Object.entries(b.cost).forEach(([k, v]) => S.stock[k] -= v); S.built[b.k] = true;
-    note('The ' + b.name.toLowerCase().replace("oona's ", '') + ' is up. You carried most of it. ' + b.perk);
-    if (b.k === 'loom') addTrust('oona', 2); else addTrust('maren', 1);
-    if (sleep() !== before.sleep) note('Tonight you sleep here: ' + sleep().toLowerCase() + '.');
-    if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
-    newDay(); render();
-  });
+  $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
   $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
   $('journal').innerHTML = S.journal.slice(0, 6).map(j => `<li><span class="num">${j.d}</span>${esc(j.t)}</li>`).join('') || '<li class="muted">Nothing written yet.</li>';
