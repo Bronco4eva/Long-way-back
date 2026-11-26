@@ -47,14 +47,16 @@ p{margin:0}
 .scene{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:2px solid var(--line);border-radius:4px;background:var(--raised)}
 .scene.strip{aspect-ratio:3/1}
 .vmap{position:relative;display:block}
-.vmap .pin{position:absolute;width:44px;height:44px;min-height:0;padding:0;border:0;background:none;transform:translate(-50%,-50%);display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
-.pin i{display:block;width:15px;height:15px;transform:rotate(45deg);background:var(--muted);border:2px solid #0D1215;box-shadow:0 0 0 2px rgba(228,233,236,.85)}
-.pin.bad i{background:var(--warn)} .pin.ok i{background:var(--moss)} .pin.odd i{background:var(--water)}
-.pin.go i{background:var(--ember);animation:pinpulse 1.2s steps(2) infinite}
-.pin[aria-pressed="true"] i{width:21px;height:21px;box-shadow:0 0 0 3px #fff}
-@keyframes pinpulse{50%{box-shadow:0 0 0 5px rgba(255,138,76,.9)}}
-@media (prefers-reduced-motion:reduce){.pin.go i{animation:none}}
-.key{display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin:.5rem 0 0;font-size:.8125rem;color:var(--muted)} .key i{display:inline-block;width:9px;height:9px;transform:rotate(45deg);margin-right:.45rem}
+.vmap svg{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);overflow:visible}
+.spot{cursor:pointer;color:var(--muted);outline:none;-webkit-tap-highlight-color:transparent}
+.spot > *{fill:currentColor;fill-opacity:.07;stroke:currentColor;stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:all;filter:drop-shadow(0 0 2px currentColor)}
+.spot.bad{color:var(--warn)} .spot.ok{color:var(--moss)} .spot.odd{color:var(--water)} .spot.go{color:var(--ember)}
+.spot.ok > *{stroke-opacity:.5;stroke-width:2;fill-opacity:0;filter:none} .spot.odd > *{stroke-opacity:.7}
+.spot.go > *{animation:spotglow 1.4s ease-in-out infinite}
+.spot.on > *,.spot:focus-visible > *{stroke:#fff;stroke-width:3.5;fill-opacity:.22;filter:drop-shadow(0 0 5px currentColor);animation:none}
+@keyframes spotglow{50%{fill-opacity:.28;filter:drop-shadow(0 0 6px currentColor)}}
+@media (prefers-reduced-motion:reduce){.spot.go > *{animation:none}}
+.key{display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin:.5rem 0 0;font-size:.8125rem;color:var(--muted)} .key i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:.45rem}
 .scene.zoom{background-repeat:no-repeat;background-size:230%}
 .face{width:72px;height:72px;flex:none;border:2px solid var(--line);border-radius:4px;object-fit:cover;background:var(--raised)}
 .face.sm{width:44px;height:44px}
@@ -153,8 +155,8 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="gut screen" data-tab="camp" hidden>
     <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
     <div><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
-      <p class="key" aria-hidden="true"><span><i style="background:var(--ember)"></i>You can fix this now</span><span><i style="background:var(--warn)"></i>Something is wrong here</span><span><i style="background:var(--moss)"></i>All is well</span></p>
-      <p class="small muted" style="margin:.4rem 0 0">Tap a place in the picture to walk over and see what is wrong there.</p></div>
+      <p class="key" aria-hidden="true"><span><i style="color:var(--ember)"></i>You can fix this now</span><span><i style="color:var(--warn)"></i>Something is wrong here</span><span><i style="color:var(--moss)"></i>All is well</span></p>
+      <p class="small muted" style="margin:.4rem 0 0">Tap an outlined place in the picture to walk over and see what is wrong there.</p></div>
     <section class="panel" id="spotBox"></section>
     <section>
       <p class="eyebrow">The known world</p>
@@ -334,6 +336,18 @@ const BUILDS = [
 ];
 const STAGED = BUILDS.filter(b => !b.side);
 // The places you can tap in the village picture. at = where the marker sits, as a percent of the picture.
+// The outline drawn round each place, traced on the 1024 by 576 village pictures. [first stage, last stage, shape]:
+// a shape is 'cx cy rx ry' for an oval or a list of 'x,y' corners. Outlines grow as the place does.
+const SHAPES = {
+  house:  [[1, 12, '345,300 385,246 515,206 552,260 546,286 412,327']],
+  yard:   [[1, 2, '510 322 46 24'], [3, 12, '488 312 170 66']],
+  mound:  [[1, 12, '256 252 70 37']],
+  stream: [[1, 12, '546 458 58 25'], [7, 12, '622,412 716,362 764,410 758,452 700,478 628,446'], [9, 12, '243,356 290,330 357,370 352,410 310,430 248,396']],
+  fields: [[1, 5, '190 470 125 46'], [6, 12, '98,480 222,424 392,492 390,524 282,576 240,576'], [8, 12, '0,303 182,314 197,340 150,360 0,352'], [8, 12, '0,403 150,398 187,425 100,472 0,472'],
+           [8, 12, '162 192 64 31'], [8, 12, '268 168 54 25'], [8, 12, '498,142 540,113 662,124 657,166 600,180 503,161']],
+  ruins:  [[1, 8, '676,290 750,276 758,240 832,250 836,298 890,293 948,326 950,372 900,422 850,422 760,388 700,386'], [9, 12, '688,282 755,276 757,238 834,248 838,300 948,326 952,372 870,424 790,396 720,332 690,302'], [11, 12, '880,148 934,148 934,224 880,224']],
+  mine:   [[1, 12, '305 118 44 31']]
+};
 const SPOTS = [
   {k:'house',  name:'The longhouse', at:[41, 42], d:'The one roof in Hollow Ash. Everyone sleeps under it.'},
   {k:'yard',   name:'The yard',      at:[53, 60], d:'The ground in front of the longhouse, where the fire is and where everyone ends up.'},
@@ -1420,8 +1434,11 @@ function renderCamp(){
     const c = $('campPic'), key = stage + openSpot + SPOTS.map(s => spotState(s.k)[0]).join('');
     if (c && c.dataset.st !== key){ c.dataset.st = key;
       const word = {go:'you can fix something here now', bad:'something is wrong here', ok:'all is well', odd:'nobody goes in'};
-      c.innerHTML = villagePic('scene') + SPOTS.map(s => { const st = spotState(s.k); return `<button class="pin ${st}" data-spot="${s.k}" style="left:${s.at[0]}%;top:${s.at[1]}%" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}"><i></i></button>`; }).join('');
-      c.querySelectorAll('.pin').forEach(btn => btn.onclick = () => { openSpot = btn.dataset.spot; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); });
+      c.innerHTML = villagePic('scene') + '<svg viewBox="0 0 1024 576" preserveAspectRatio="none">' + SPOTS.filter(s => s.k !== 'house').concat(SPOTS[0]).map(s => { const st = spotState(s.k);
+        return `<g class="spot ${st}${s.k === openSpot ? ' on' : ''}" data-spot="${s.k}" tabindex="0" role="button" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}">` + SHAPES[s.k].filter(a => stage >= a[0] && stage <= a[1]).map(a => { const n = a[2].split(' ');
+          return a[2].includes(',') ? `<polygon points="${a[2]}"/>` : `<ellipse cx="${n[0]}" cy="${n[1]}" rx="${n[2]}" ry="${n[3]}"/>`; }).join('') + '</g>'; }).join('') + '</svg>';
+      c.querySelectorAll('.spot').forEach(g => { const go = () => { openSpot = g.dataset.spot; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); };
+        g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } }; });
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
     $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
