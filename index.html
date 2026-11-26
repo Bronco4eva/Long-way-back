@@ -91,6 +91,8 @@ canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--
 .who{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem}
 .pips{display:flex;gap:3px} .pips i{width:10px;height:10px;border:2px solid var(--muted);display:block}
 .pips i.on{background:var(--moss);border-color:var(--moss)}
+.rounds{display:grid;grid-template-columns:repeat(8,1fr);gap:6px 4px;margin:.6rem 0 .4rem} .rounds span{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6875rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.rounds i{width:100%;max-width:26px;height:14px;border:2px solid var(--muted);display:block} .rounds .on i{background:var(--moss);border-color:var(--moss)} .rounds .on{color:var(--ink)} .rounds .now i{border-style:dashed}
 .mends{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column} .mends li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.4rem} .mends li.ok .small{color:var(--muted)} .mends .hurt{color:var(--warn)}
 .frag{border-left:3px solid var(--ember);padding:.2rem 0 .2rem .75rem;margin:.6rem 0} .frag .say{margin:.25rem 0 0} .frag.item{border-left-color:var(--gold, #D8C56A)}
 .lore{margin:.5rem 0 0;padding-left:1.4rem;display:flex;flex-direction:column;gap:.6rem;font-family:var(--story);font-style:italic}
@@ -143,6 +145,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   </div>
 
   <div class="gut screen" data-tab="board" style="padding-top:1rem">
+    <div class="banner" id="newsBanner" hidden style="border-color:var(--moss)"><span id="newsText"></span><button class="quiet" id="newsOk">Good</button></div>
     <div class="banner" id="practiceBanner" hidden>
       <span><b>Practice mode.</b> No GPS here, so you walk by tapping. This story is kept apart from your real one.</span>
       <button class="quiet" id="exitPractice">Use real GPS</button>
@@ -174,6 +177,13 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
         <button id="stepBtn">Log steps</button>
       </div>
       <p class="small num" id="stepLine"></p>
+    </section>
+    <section class="panel">
+      <div class="thead"><img class="face sm" src="art/p-tobiah.jpg" alt="" onerror="this.hidden=true"><h2>Tobiah's rounds</h2></div>
+      <p class="small muted">Tobiah sat out one winter with his knee and it never came right. His rule for you: do not stay down for a whole hour. Every hour of the day in which you get up and walk at least 250 steps is one round of the camp. Each round counts as a chore done, and the fourth round of a day earns his trust and a bundle of herbs.</p>
+      <div class="rounds" id="roundPips" role="img"></div>
+      <p class="small num" id="roundLine"></p>
+      <details class="lochelp"><summary>Set this up on your iPhone</summary><div id="roundHelp"></div></details>
     </section>
   </div>
 
@@ -471,7 +481,7 @@ const blank = () => ({intro:false, home:null, first:today(), seen:today(),
   trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
   stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{}, v:2,
   board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
-  journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}});
+  journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}, rounds:{date:'', hours:{}, paid:0}});
 // Saves from before the build list followed the picture: keep the loom, and carry over the count of other things built.
 function migrate(j){
   if (j.v >= 2) return j;
@@ -985,9 +995,53 @@ function logSteps(n){
   return earned;
 }
 
+/* Tobiah's rounds: steps for each hour of today, handed in by a phone shortcut. An hour with enough steps is one round. */
+const ROUND = {steps:250, from:6, to:21, cap:8, bonusAt:4};
+const ROUNDHELP = `<p class="small muted">Two small shortcuts in the iPhone Shortcuts app do this. One opens the game and hands it your steps from Health. The other checks on you each hour and tells you to get up. These steps have not been tried on a real phone yet, so tell us where they go wrong.</p>
+  <p class="small"><b>1. The game opener</b></p><ol>
+  <li>Open Shortcuts, tap +, and name the new shortcut The Long Way Back.</li>
+  <li>Add the action Find Health Samples. Set Type to Steps. Add the filter Start Date is today. Set Group By to Hour and Sort By to Start Date.</li>
+  <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen.</li>
+  <li>Below End Repeat add Combine Text, with Custom separator <b>_</b> (an underscore).</li>
+  <li>Add a URL action with <b>${location.origin + location.pathname}?hours=</b> and put the Combined Text right after the equals sign.</li>
+  <li>Add Open URLs. Then use Share, Add to Home Screen, and open the game from that icon from now on. Say Allow when it asks to read Health.</li></ol>
+  <p class="small"><b>2. Tobiah's nudge</b></p><ol>
+  <li>Make a second shortcut named Tobiah's nudge. Add Find Health Samples again: Type Steps, Start Date is today, Group By Hour, Sort By Start Date, Latest First, Limit 1.</li>
+  <li>Add two Format Date actions, both Custom <b>H</b>: one on that sample's Start Date, one on Current Date.</li>
+  <li>Add If: the first formatted date is not the second. Inside it add Show Notification with the words "Tobiah: you have been down a whole hour. Up. Once round the camp."</li>
+  <li>Under Otherwise add a second If: the sample's Value is less than 250, with the same Show Notification inside.</li>
+  <li>On the Automation tab tap +, choose Time of Day, set 9:50, Daily, Run Immediately, and pick Tobiah's nudge. Add one of these for each hour you want watched.</li></ol>
+  <p class="small muted">Open the game from a normal Safari bookmark and it still works; you just hand in no hours that time. Your steps go from Health to this page on your phone and nowhere else.</p>`;
+const roundHours = () => { const out = []; for (let h = ROUND.from; h <= ROUND.to; h++) out.push(h); return out; };
+const roundsToday = () => S.rounds && S.rounds.date === today() ? S.rounds : {date:today(), hours:{}, paid:0};
+const roundCount = r => roundHours().filter(h => (r.hours[h] || 0) >= ROUND.steps).length;
+// "9-320_10-45_14-1,200" -> {9:320, 10:45, 14:1200}. Hours the phone left out had no steps.
+function parseHours(text){
+  const out = {}; let any = false;
+  String(text).split('_').forEach(part => {
+    const m = /^\s*(\d{1,2})\s*-\s*([\d.,\s]+)$/.exec(part); if (!m) return;
+    const h = +m[1], n = +m[2].replace(/[.,]\d{1,2}\s*$/, '').replace(/\D/g, '');
+    if (h > 23 || !(n >= 0) || n > 60000) return;
+    out[h] = (out[h] || 0) + n; any = true;
+  });
+  return any ? out : null;
+}
+function logHours(hours){
+  const r = roundsToday();
+  Object.keys(hours).forEach(h => r.hours[h] = Math.max(r.hours[h] || 0, hours[h]));   // an hour's count never goes down
+  const done = Math.min(ROUND.cap, roundCount(r)), earned = Math.max(0, done - r.paid);
+  for (let i = 0; i < earned; i++){ const k = ['food','water','wood'].sort((a, b) => S.stock[a] - S.stock[b])[0]; S.stock[k]++; }
+  const bonus = r.paid < ROUND.bonusAt && done >= ROUND.bonusAt;
+  if (bonus){ addTrust('tobiah', 1); S.stock.herbs++; note('Four rounds of the camp today, none of them asked for. Tobiah watched the last one from his stool and handed you a bundle of herbs without a word.'); }
+  r.paid = Math.max(r.paid, done); S.rounds = r;
+  const total = Object.values(r.hours).reduce((a, b) => a + b, 0);
+  const chores = logSteps(Math.max(total, S.stepLog.date === today() ? S.stepLog.steps : 0));
+  return {earned, bonus, chores};
+}
+
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
 let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
-let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0;
+let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
 const aiOn = () => !!(sampleFn || apiKey);
 if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
 function aiErr(e){
@@ -1178,6 +1232,7 @@ function render(){
   shownKey = viewKey();
   const el = $('main'), m = S.mission;
   $('practiceBanner').hidden = !practice;
+  $('newsBanner').hidden = !shortcutNews; $('newsText').innerHTML = '<b>From your phone\'s step count.</b> ' + esc(shortcutNews);
   const playing = S.intro && !!S.home;
   $('hud').hidden = $('tabs').hidden = !playing;
   showTab(playing ? tab : 'board');
@@ -1500,6 +1555,12 @@ function renderCamp(){
   $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
   $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
+  { const r = roundsToday(), n = roundCount(r), nowH = new Date().getHours(), lab = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p'), any = Object.keys(r.hours).length;
+    $('roundPips').innerHTML = roundHours().map(h => `<span class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : h === nowH ? 'now' : ''}"><i></i>${lab(h)}</span>`).join('');
+    $('roundPips').setAttribute('aria-label', n + ' rounds walked today');
+    $('roundLine').textContent = !any ? 'No hours handed in today. Open the game from the shortcut below and they fill in on their own.'
+      : n + (n === 1 ? ' round' : ' rounds') + ' today.' + (n < ROUND.bonusAt ? ' ' + (ROUND.bonusAt - n) + ' more for Tobiah\'s trust and herbs.' : n >= ROUND.cap ? ' That is every round he counts in a day.' : ' Tobiah has noticed.') + ((r.hours[nowH] || 0) < ROUND.steps && nowH >= ROUND.from && nowH <= ROUND.to ? ' This hour is still open: ' + Math.max(0, ROUND.steps - (r.hours[nowH] || 0)) + ' steps to go.' : '');
+    $('roundHelp').innerHTML = ROUNDHELP; }
   $('journal').innerHTML = S.journal.slice(0, 6).map(j => `<li><span class="num">${j.d}</span>${esc(j.t)}</li>`).join('') || '<li class="muted">Nothing written yet.</li>';
   $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
   $('ideaPanel').hidden = !aiOn();
@@ -1526,6 +1587,7 @@ function simWalk(){
 
 /* ---------- static controls ---------- */
 $('exitPractice').onclick = () => setPractice(false);
+$('newsOk').onclick = () => { shortcutNews = ''; $('newsBanner').hidden = true; };
 $('stepBtn').onclick = () => {
   const n = Math.floor(+$('stepInput').value);
   if (!(n >= 0) || n > 200000){ $('stepLine').textContent = 'Enter a step count between 0 and 200,000.'; return; }
@@ -1552,8 +1614,13 @@ function boot(){ fillPrivacy();
   else if (S.intro) startGPS();
   render();
 }
-const qs = new URLSearchParams(location.search).get('steps');   // lets a phone shortcut pass today's steps in the link
-if (qs && /^\d{1,6}$/.test(qs) && S.home) logSteps(+qs);
+const qp = new URLSearchParams(location.search), qs = qp.get('steps'), qh = parseHours(qp.get('hours') || '');   // a phone shortcut passes today's steps in the link
+if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
+  const got = qh ? logHours(qh) : {earned:0, bonus:false, chores:0};
+  if (qs && /^\d{1,6}$/.test(qs)) got.chores += logSteps(Math.max(+qs, S.stepLog.steps));
+  if (got.earned || got.chores) shortcutNews = (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? 'Pip marked ' + got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
+  try { history.replaceState(null, '', location.pathname); } catch {}
+}
 boot();
 window.__lwb = {get S(){ return S; }, newDay, render};
 })();
