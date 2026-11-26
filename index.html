@@ -82,7 +82,7 @@ canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--
 .pips{display:flex;gap:3px} .pips i{width:10px;height:10px;border:2px solid var(--muted);display:block}
 .pips i.on{background:var(--moss);border-color:var(--moss)}
 .mends{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column} .mends li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.4rem} .mends li.ok .small{color:var(--muted)} .mends .hurt{color:var(--warn)}
-.frag{border-left:3px solid var(--ember);padding:.2rem 0 .2rem .75rem;margin:.6rem 0} .frag .say{margin:.25rem 0 0}
+.frag{border-left:3px solid var(--ember);padding:.2rem 0 .2rem .75rem;margin:.6rem 0} .frag .say{margin:.25rem 0 0} .frag.item{border-left-color:var(--gold, #D8C56A)}
 .lore{margin:.5rem 0 0;padding-left:1.4rem;display:flex;flex-direction:column;gap:.6rem;font-family:var(--story);font-style:italic}
 .hero{display:flex;gap:.9rem;align-items:center} .hero img{width:5.5rem;height:5.5rem;object-fit:cover;border:2px solid var(--line);border-radius:4px;flex:none}
 .bar{height:8px;background:var(--raised);border:1px solid var(--line);border-radius:2px;overflow:hidden} .bar i{display:block;height:100%;background:var(--ember)}
@@ -370,6 +370,23 @@ const FINDS = {
 const FIND_TOTAL = Object.values(FINDS).reduce((n, a) => n + a.length, 0);
 const findText = id => { const [k, i] = String(id).split(':'); return (FINDS[k] || [])[+i] || ''; };
 const nextFind = res => { for (const k of [res, 'road']){ const i = (FINDS[k] || []).findIndex((_, n) => !frags().includes(k + ':' + n)); if (i >= 0) return k + ':' + i; } return null; };
+// Useful things found at places. Each sits at one kind of place and turns up on a set visit, so nothing is random.
+// "you" items stay in your kit and change what you can do. The rest go to a villager when you get home.
+const ITEMS = [
+  {k:'flask', at:'water', n:2, name:'Stoppered clay flask', found:'Wedged under the basin rim: a clay flask with its stopper still in, older than anyone living. It holds water and does not leak.', who:'you', bonus:['water', 2], does:'Bring back 2 more water from every spring trip.'},
+  {k:'cup', at:'water', n:5, name:'Small bronze cup', found:'In the silt of the pool, a bronze cup no bigger than a fist, with the same short line of marks cut round its lip.', who:'isla', trust:{isla:2}, does:'Isla feeds Wren from it now. She says the baby takes more water from the cup than from her hands.'},
+  {k:'hatchet', at:'wood', n:2, name:'Old hatchet head', found:'Sunk in a stump and grown over: a hatchet head of dark metal with barely a spot of rust on it. Dack fitted a handle without being asked.', who:'you', bonus:['wood', 2], does:'Bring back 2 more wood from every grove trip.'},
+  {k:'staff', at:'wood', n:5, name:'Walking staff', found:'Leaning in the crook of the stone figure\'s arm, as if left for a moment: a staff of pale wood, worn to a shine where a hand goes.', who:'you', reps:1, does:'Workouts need 10% fewer reps.'},
+  {k:'sickle', at:'food', n:2, name:'Bronze sickle', found:'Lying in the grass inside the stone ring, green with age but still sharp along the inside curve.', who:'you', bonus:['food', 2], does:'Bring back 2 more food from every meadow trip.'},
+  {k:'pot', at:'food', n:4, name:'Iron cook pot', found:'Half buried beside the stone seat: an iron pot with three legs and no holes. You carried it home on your head.', who:'maren', trust:{maren:1}, stock:{food:3}, does:'Maren hung it over the fire that night. The first stew out of it fed everyone twice.'},
+  {k:'chisel', at:'stone', n:2, name:'Mason\'s chisel and wedge', found:'On a ledge of the quarry, laid side by side, as if the mason meant to come back after eating.', who:'you', bonus:['stone', 2], does:'Bring back 2 more stone from every quarry trip.'},
+  {k:'lamp', at:'stone', n:4, name:'Stone lamp', found:'A lamp cut from one piece of stone, in a niche beside the carved doorway. There was still a crust of old oil in it.', who:'pip', trust:{pip:1, tobiah:1}, does:'It burns all night in the hut on a thumb of fat. Pip watches it until sleep comes, and Tobiah can see to grind herbs after dark.'},
+  {k:'needles', at:'fiber', n:2, name:'Roll of bone needles', found:'A leather roll in the hollow of a walkway post: six bone needles, each a different size, the finest thin enough to thread.', who:'oona', trust:{oona:2}, does:'Oona took them without a word and had mended three coats by morning.'},
+  {k:'reedknife', at:'fiber', n:4, name:'Hooked reed knife', found:'In the mud at the foot of the stone head: a hooked blade with a grip that fits your hand as if it had been measured.', who:'you', bonus:['fiber', 2], does:'Bring back 2 more fiber from every reed bank trip.'},
+  {k:'mortar', at:'herbs', n:2, name:'Stone mortar', found:'In the niche under the small figure, behind the flowers: a mortar and its pestle, worn into each other.', who:'tobiah', trust:{tobiah:2}, stock:{herbs:2}, does:'Tobiah turned it over for a long time. The medicines are ground finer now and go further.'},
+  {k:'boots', at:'herbs', n:4, name:'Marching boots', found:'Under the cracked tablet, wrapped in oiled hide: a pair of boots with nailed soles, stiff but whole. They fit, near enough.', who:'you', carry:2, does:'Carry 2 more each trip. The foam clogs are retired.'}
+];
+const item = k => ITEMS.find(i => i.k === k);
 // Character sheet. Attributes grow from what the player really does; levels give points to spend on perks.
 const ATTR = [
   {k:'legs', name:'Legs', d:'Distance walked on tasks', val:() => S.stats.meters / 1000, steps:[0,2,5,10,18,30,45,65,90,120], fmt:v => fmtDist(v * 1000)},
@@ -435,10 +452,13 @@ const standing = () => Object.values(S.trust).reduce((a, b) => a + b, 0);
 const rankIdx = () => { let i = 0; RANKS.forEach((r, n) => { if (standing() >= r[0]) i = n; }); return i; };
 const perks = () => S.perks || (S.perks = {});
 const frags = () => S.frags || (S.frags = []);
+const items = () => S.items || (S.items = []);
+const visits = () => S.visits || (S.visits = {});
+const kit = f => items().map(item).filter(i => i && f(i));
 const gear = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
-const carry = () => gear() + (perks().back || 0);
+const carry = () => gear() + (perks().back || 0) + kit(i => i.carry).reduce((n, i) => n + i.carry, 0);
 const attrLvl = a => { const v = a.val(); let i = 0; while (i < a.steps.length - 1 && v >= a.steps[i + 1]) i++; return i + 1; };
-const xp = () => Math.round(S.stats.tasks * 10 + S.stats.meters / 100 + (S.stats.reps || 0) / 2 + S.stats.wins * 15 + frags().length * 5 + REPAIRS.filter(r => S.fixed[r.k]).length * 10);
+const xp = () => Math.round(S.stats.tasks * 10 + S.stats.meters / 100 + (S.stats.reps || 0) / 2 + S.stats.wins * 15 + frags().length * 5 + items().length * 8 + REPAIRS.filter(r => S.fixed[r.k]).length * 10);
 const lvlAt = n => 30 * n * (n - 1);
 const level = () => { const x = xp(); let n = 1; while (x >= lvlAt(n + 1)) n++; return n; };
 const points = () => level() - 1 - PERKS.reduce((t, k) => t + (perks()[k.k] || 0), 0);
@@ -794,7 +814,7 @@ function startMission(){
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
 }
-const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1) * (1 - 0.1 * (perks().wind || 0)));
+const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1) * (1 - 0.1 * (perks().wind || 0)) * (1 - 0.1 * kit(i => i.reps).length));
 function arrive(){
   const m = S.mission; buzz();
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
@@ -803,6 +823,8 @@ function arrive(){
     note('You found the ' + placeName(pk) + (m.name ? ' at ' + m.name : '') + '. It is on your map now, and it will be there next time.');
   }
   { const f = nextFind(TASKS[m.id].res); if (f){ m.frag = f; frags().push(f); note((f.startsWith('road') ? 'On the way to the ' : 'At the ') + SITE[TASKS[m.id].res] + ': ' + findText(f)); } }
+  { const res = TASKS[m.id].res; visits()[res] = (visits()[res] || 0) + 1;
+    const it = ITEMS.find(i => i.at === res && visits()[res] >= i.n && !items().includes(i.k)); if (it) m.item = it.k; }
   if (TASKS[m.id].battle){ m.phase = 'battle'; m.reps = 0; m.bt0 = 0; }
   else m.phase = 'back';
   save(); render();
@@ -815,7 +837,7 @@ function endBattle(won){
 }
 function unload(){
   const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
-  const before = {sleep:sleep(), carry:carry(), rank:rankIdx(), lvl:level()};
+  const before = {sleep:sleep(), carry:gear(), rank:rankIdx(), lvl:level()};
   const notes = [];
   const speed = elapsed > 0 ? m.meters / elapsed : 0, simd = pos && pos.sim;
   let tr = T.tr, haul = Math.min(carry(), Math.max(1, Math.round(planned / 100)));
@@ -838,17 +860,25 @@ function unload(){
     note('You put the feverbark in Tobiah\'s hands with a day\'s walk still in your legs. By morning Wren was cool to the touch. Isla held your arm and did not let go for a while.');
     haul = 0;
   } else {
+    { const extra = kit(i => i.bonus && i.bonus[0] === T.res).reduce((n, i) => n + i.bonus[1], 0); if (extra){ haul += extra; notes.push('Your tools brought in ' + extra + ' more'); } }
     S.stock[T.res] += haul; addTrust(T.g, tr);
+  }
+  let got = null;
+  if (m.item && !items().includes(m.item)){
+    got = item(m.item); items().push(got.k);
+    Object.entries(got.trust || {}).forEach(([k, v]) => addTrust(k, v));
+    Object.entries(got.stock || {}).forEach(([k, v]) => S.stock[k] += v);
+    note('You brought home a find: ' + got.name.toLowerCase() + '. ' + got.does);
   }
   if (!T.rescue) S.board.done[m.id] = true;
   { const N = neglect(); N.lastHelp = today(); N.stage = 0; }
   const steps = Math.round(m.meters / 0.78);
   S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
-  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag};
+  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag, item:got ? got.k : null};
   if (S.stats.tasks % 5 === 0 && neglect().rests < 3 + (perks().rest || 0)){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
   S.mission = null;
   if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
-  if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
+  if (gear() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
   if (rankIdx() !== before.rank) note('Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
   if (level() !== before.lvl) note('Something has changed in you. Level ' + level() + '. You have a point to spend on the You screen.');
   if (S.stats.tasks === 1) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
@@ -1107,7 +1137,7 @@ function render(){
     el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
       <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. Your phone buzzes when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
-      ${!out && m.frag != null ? `<div class="frag"><p class="eyebrow">${String(m.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(m.frag))}</p></div>` : ''}
+      ${!out && m.frag != null ? `<div class="frag"><p class="eyebrow">${String(m.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(m.frag))}</p></div>` : ''}${!out && m.item && item(m.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(m.item).name)}.</b> ${esc(item(m.item).found)}</p><p class="small">${item(m.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(m.item).who].name + '. '}Get it home and it counts.</p></div>` : ''}
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
@@ -1153,7 +1183,7 @@ function render(){
     if (L){
       const T = TASKS[L.id];
       h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.rescue ? (L.freed ? PEOPLE[L.freed].name + ' is home' : 'Driven off at the stockade') : T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
-        <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p>${L.frag != null ? `<div class="frag"><p class="eyebrow">${String(L.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(L.frag))}</p></div>` : ''}</div>`;
+        <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p>${L.frag != null ? `<div class="frag"><p class="eyebrow">${String(L.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(L.frag))}</p></div>` : ''}${L.item && item(L.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(L.item).name)}.</b> ${esc(item(L.item).found)}</p><p class="small">${item(L.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(L.item).who].name + '. '}${esc(item(L.item).does)}</p></div>` : ''}</div>`;
     }
     const arc = S.fever && !S.fever.done && !S.fever.failed, tk = takenList(), CS = campState();
     h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${tk.length ? 'The Tallymen have ' + names(tk) : arc ? 'Wren is burning up' : CS.mood === 'Marked' ? 'There is a mark on the hut door' : CS.mood === 'Watched' ? 'Scouts on the ridge' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2>
@@ -1295,7 +1325,8 @@ function renderCamp(){
         <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
       <ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
         <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul>
-      <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>A hoodie, sweatpants and foam clogs from another world</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
+      <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>${items().includes('boots') ? 'A hoodie, sweatpants and a dead soldier\'s marching boots' : 'A hoodie, sweatpants and foam clogs from another world'}</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
+      <p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Keep going back to the same places. Old tools and useful things turn up there, some for you and some for the camp.</p>'}
       <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'You earn one point each level. XP comes from tasks, distance, workouts, repairs and what you find.'}</p>
       <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul>`;
     $('sheet').querySelectorAll('button[data-perk]').forEach(btn => btn.onclick = () => {
