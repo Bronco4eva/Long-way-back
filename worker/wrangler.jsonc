@@ -3,6 +3,8 @@
   "name": "long-way-back-push",
   "main": "src/index.js",
   "compatibility_date": "2025-10-01",
+  // Keep the public workers.dev address switched on; the game calls it.
+  "workers_dev": true,
   // No id on purpose: wrangler creates the storage on first deploy.
   "kv_namespaces": [{ "binding": "SUBS" }],
   // Ten to every hour. The Worker itself decides whose waking hours it is.
