@@ -1080,7 +1080,7 @@ setInterval(() => {
 }, 1000);
 
 /* Reminders: a small server sends "get up" calls to this phone. It is told the push address, time zone and hours, nothing else. */
-const PUSH_URL = '';   // set once the reminder server exists
+const PUSH_URL = 'https://long-way-back-push.vine79.workers.dev';
 const standalone = () => !!navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
 const pushCapable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 let pushState = {on:false, busy:false, msg:''}, pushHours = (() => { try { return JSON.parse(store.get('lwb-push-hours')) || [9, 20]; } catch { return [9, 20]; } })();
