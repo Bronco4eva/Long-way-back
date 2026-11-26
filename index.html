@@ -81,6 +81,7 @@ canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--
 .who{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem}
 .pips{display:flex;gap:3px} .pips i{width:10px;height:10px;border:2px solid var(--muted);display:block}
 .pips i.on{background:var(--moss);border-color:var(--moss)}
+.mends{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column} .mends li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.4rem} .mends li.ok .small{color:var(--muted)} .mends .hurt{color:var(--warn)}
 .cost{font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .built{color:var(--moss);font:400 1.25rem var(--display);white-space:nowrap}
 .journal li{padding:.55rem 0;border-top:2px solid var(--line);font-family:var(--story);font-size:.9375rem}
@@ -136,6 +137,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="gut screen" data-tab="camp" hidden>
     <img class="scene" src="art/village.jpg" alt="Hollow Ash at dusk: one hut, a fire with three figures, a ruined arch, smoke on the far ridge" onerror="this.hidden=true">
     <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
+    <section class="panel" id="insideBox"></section>
     <section>
       <p class="eyebrow">The known world</p>
       <canvas id="world" aria-label="Map of camp and the places you have found" style="margin-top:.5rem"></canvas>
@@ -282,6 +284,13 @@ const BUILDS = [
   {k:'smoke',   name:'Smokehouse',  perk:'The camp uses one less food each day.', cost:{wood:15, stone:10, food:10}},
   {k:'wall',    name:'Palisade',    perk:'Walls. The first night anyone sleeps soundly.', cost:{wood:30, stone:10}}
 ];
+// The inside of the hut. Mended in this order, roof first; each one has a villager who suffers until it is done.
+const REPAIRS = [
+  {k:'roof', name:'Patch the thatch', who:'isla', cost:{fiber:5, wood:2}, bad:'Rain comes through a hole in the roof and onto the bedding.', hurt:'Isla keeps Wren in the one dry corner and does not sleep.', good:'The roof holds. Isla slept through the night for the first time since the river.'},
+  {k:'shutters', name:'Hang new shutters', who:'tobiah', cost:{wood:6}, bad:'The shutter hangs by one hinge and the wind comes straight through.', hurt:"Tobiah's knee locks in the cold and he cannot stand without the wall.", good:'The shutters close. Tobiah stood up this morning without reaching for the wall.'},
+  {k:'hearth', name:'Rebuild the hearth', who:'pip', cost:{stone:6, wood:2}, bad:'The hearth has fallen in and the fire barely holds.', hurt:'Pip sleeps curled around the ash, shivering.', good:'The hearth draws. Pip sleeps stretched out, like someone who expects to wake up warm.'},
+  {k:'beds', name:'Raise sleeping benches', who:'dack', cost:{wood:6, fiber:4}, bad:'Everyone sleeps on wet straw on the bare earth.', hurt:'Dack sits up against a post all night instead.', good:'Benches off the ground and dry straw on them. Even Dack lies down.'}
+];
 const RANKS = [[0,'Stranger'],[6,'Hauler'],[14,'Forager'],[24,'Scout'],[36,'Warden']];
 const MOVES = [{n:'jumping jacks', base:20}, {n:'squats', base:15}, {n:'push-ups', base:8}, {n:'high knees', base:30}];
 const TINT = {wood:'#B98A5A', water:'#66BDD8', food:'#6FC694', stone:'#A7B0B8', fiber:'#D8C56A', herbs:'#C58BD0'};
@@ -297,7 +306,7 @@ const saveKey = () => practice ? 'lwb-save-practice' : 'lwb-save';
 const today = () => new Date().toLocaleDateString('en-CA');
 const blank = () => ({intro:false, home:null, first:today(), seen:today(),
   trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
-  stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{},
+  stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{},
   board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
   journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}});
 function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return Object.assign(blank(), j); } catch {} return blank(); }
@@ -335,7 +344,7 @@ const standing = () => Object.values(S.trust).reduce((a, b) => a + b, 0);
 const rankIdx = () => { let i = 0; RANKS.forEach((r, n) => { if (standing() >= r[0]) i = n; }); return i; };
 const carry = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
 const carryName = () => carry() === 20 ? "Oona's woven pack" : carry() === 10 ? "Oona's sling" : 'Your two hands';
-const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : S.trust.maren >= 3 ? 'The hut floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
+const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the hut, on a bench you built' : S.trust.maren >= 3 ? 'The hut floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
 const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
 const needs = () => ({food:S.built.smoke ? 1 : 2, water:S.built.cistern ? 1 : 2, wood:1});
 function note(text){ S.journal.unshift({d:today(), t:text}); S.journal = S.journal.slice(0, 30); }
@@ -793,7 +802,7 @@ function worldBrief(){
   return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one hut, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
 The player is "the Stranger", who appeared from another world (ours), out of shape and wearing Crocs, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
 The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
-Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
+Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. Inside the hut, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
 }
 function charRules(k){
   const p = PEOPLE[k], t = S.trust[k];
@@ -1161,6 +1170,23 @@ function renderCamp(){
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
   $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small></div>`).join('');
+  { const done = REPAIRS.filter(r => S.fixed[r.k]).length, nextR = REPAIRS.find(r => !S.fixed[r.k]);
+    $('insideBox').innerHTML = `<p class="eyebrow">Inside the hut</p>${pic('inside-' + done, 'scene', done === REPAIRS.length ? 'Inside the hut, mended: a whole roof, closed shutters, a good fire and dry beds' : 'Inside the hut: cold, damp and in bad repair, with the survivors huddled in it')}
+      <p class="small">${done === REPAIRS.length ? 'Roof, shutters, hearth and beds are all mended. Nobody in here is cold tonight.' : done ? done + ' of ' + REPAIRS.length + ' mended. The rest still hurts someone every night.' : 'This is where they sleep. Everything in it is broken, and someone suffers for each broken thing until it is mended.'}</p>
+      <ul class="mends">${REPAIRS.map(r => {
+        const P = PEOPLE[r.who], cost = Object.entries(r.cost).map(([k, v]) => v + ' ' + RES[k].toLowerCase()).join(', '), can = Object.entries(r.cost).every(([k, v]) => S.stock[k] >= v);
+        if (S.fixed[r.k]) return `<li class="ok"><div class="thead">${pic('p-' + r.who, 'face sm')}<div class="who"><h3>${r.name}</h3><span class="built">Mended</span></div></div><p class="small">${r.good}</p></li>`;
+        return `<li><div class="thead">${pic('p-' + r.who, 'face sm')}<div class="who"><h3>${r.name}</h3></div></div>
+          <p class="small">${r.bad} <span class="hurt">${taken()[r.who] ? P.name + ' is not here to suffer it. The Tallymen have ' + P.name + '.' : r.hurt}</span></p><p class="cost">Needs ${cost} from the stores.</p>
+          ${r === nextR ? `<button data-fix="${r.k}" ${can ? 'class="primary"' : 'disabled'}>${can ? 'Mend it' : 'Not enough in the stores yet'}</button>` : `<p class="small muted">Maren wants the ${nextR.k === 'roof' ? 'roof' : nextR.k === 'beds' ? 'beds' : nextR.k} done first.</p>`}</li>`;
+      }).join('')}</ul>`;
+    $('insideBox').querySelectorAll('button[data-fix]').forEach(btn => btn.onclick = () => {
+      const r = REPAIRS.find(x => x.k === btn.dataset.fix); if (S.fixed[r.k] || !Object.entries(r.cost).every(([k, v]) => S.stock[k] >= v)) return;
+      Object.entries(r.cost).forEach(([k, v]) => S.stock[k] -= v); S.fixed[r.k] = true; addTrust(r.who, 1);
+      note(r.good);
+      if (REPAIRS.every(x => S.fixed[x.k])){ addTrust('maren', 1); note('The hut is whole: roof, shutters, hearth and beds. Maren walked the length of it twice and then told you where you sleep tonight. Inside.'); }
+      newDay(); render();
+    }); }
   $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
   { const N = neglect();
     $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with Maren\'s leave' : 'Tell Maren you need two rest days (' + N.rests + ' banked)'}</button>
