@@ -39,8 +39,8 @@ p{margin:0}
 .hud-stores small{font:500 .6875rem var(--body);color:var(--muted);white-space:nowrap}
 /* screen tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom, 0px)}
-.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
-.tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:56px;padding:.3rem .1rem;font:400 1.25rem var(--display);color:var(--muted);margin-top:-2px}
+.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
+.tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:56px;padding:.3rem .05rem;font:400 1.1rem var(--display);color:var(--muted);margin-top:-2px}
 .tabs button[aria-current="true"]{color:var(--ember);border-top-color:var(--ember)}
 .banner{background:var(--surface);border:1px dashed var(--warn);padding:.6rem .75rem;border-radius:4px;font-size:.875rem;display:flex;gap:.75rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .panel{background:var(--surface);border:2px solid var(--line);border-radius:4px;padding:1rem;display:flex;flex-direction:column;gap:.9rem}
@@ -82,6 +82,12 @@ canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--
 .pips{display:flex;gap:3px} .pips i{width:10px;height:10px;border:2px solid var(--muted);display:block}
 .pips i.on{background:var(--moss);border-color:var(--moss)}
 .mends{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column} .mends li{padding:.8rem 0;border-top:2px solid var(--line);display:flex;flex-direction:column;gap:.4rem} .mends li.ok .small{color:var(--muted)} .mends .hurt{color:var(--warn)}
+.frag{border-left:3px solid var(--ember);padding:.2rem 0 .2rem .75rem;margin:.6rem 0} .frag .say{margin:.25rem 0 0}
+.lore{margin:.5rem 0 0;padding-left:1.4rem;display:flex;flex-direction:column;gap:.6rem;font-family:var(--story);font-style:italic}
+.hero{display:flex;gap:.9rem;align-items:center} .hero img{width:5.5rem;height:5.5rem;object-fit:cover;border:2px solid var(--line);border-radius:4px;flex:none}
+.bar{height:8px;background:var(--raised);border:1px solid var(--line);border-radius:2px;overflow:hidden} .bar i{display:block;height:100%;background:var(--ember)}
+.attrs{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.75rem} .attrs b{font:400 1.75rem/1 var(--display)} .attrs .bar i{background:var(--moss)}
+.perks{list-style:none;margin:.4rem 0 0;padding:0} .perks li{padding:.7rem 0;border-top:2px solid var(--line);display:flex;gap:.75rem;align-items:center;justify-content:space-between} .perks li > div{min-width:0}
 .cost{font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .built{color:var(--moss);font:400 1.25rem var(--display);white-space:nowrap}
 .journal li{padding:.55rem 0;border-top:2px solid var(--line);font-family:var(--story);font-size:.9375rem}
@@ -148,10 +154,6 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <dl class="status" id="place" style="margin-top:.5rem"></dl>
       <div id="restBox" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem"></div>
     </section>
-    <section>
-      <p class="eyebrow">Since you arrived</p>
-      <div class="stats" id="life" style="margin-top:.5rem"></div>
-    </section>
     <section class="panel">
       <div class="thead"><img class="face sm" src="art/p-pip.jpg" alt="" onerror="this.hidden=true"><h2>Pip's step count</h2></div>
       <p class="small muted">Pip keeps a tally of every step you take, even the ones outside a task. Read today's steps from your phone's Health or Fit app and log them. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
@@ -161,6 +163,14 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
         <button id="stepBtn">Log steps</button>
       </div>
       <p class="small num" id="stepLine"></p>
+    </section>
+  </div>
+
+  <div class="gut screen" data-tab="you" hidden>
+    <section class="panel" id="sheet" style="margin-top:1rem"></section>
+    <section>
+      <p class="eyebrow">Since you arrived</p>
+      <div class="stats" id="life" style="margin-top:.5rem"></div>
     </section>
   </div>
 
@@ -198,6 +208,11 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <p class="eyebrow" style="padding-top:1rem">Journal</p>
       <ul class="journal" id="journal"></ul>
     </section>
+    <section>
+      <p class="eyebrow">The old empire</p>
+      <p class="small muted" id="loreLine" style="margin-top:.4rem"></p>
+      <ol class="lore" id="lore"></ol>
+    </section>
     <section class="panel">
       <h2>Villager voices</h2>
       <p class="small" id="aiStatus"></p>
@@ -225,7 +240,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
 </div>
 
 <nav class="tabs" id="tabs" hidden aria-label="Game screens"><div>
-  <button data-go="board">Board</button><button data-go="camp">Camp</button><button data-go="people">People</button><button data-go="build">Build</button><button data-go="journal">Journal</button>
+  <button data-go="board">Board</button><button data-go="camp">Camp</button><button data-go="you">You</button><button data-go="people">People</button><button data-go="build">Build</button><button data-go="journal">Journal</button>
 </div></nav>
 
 <script>
@@ -291,6 +306,82 @@ const REPAIRS = [
   {k:'hearth', name:'Rebuild the hearth', who:'pip', cost:{stone:6, wood:2}, bad:'The hearth has fallen in and the fire barely holds.', hurt:'Pip sleeps curled around the ash, shivering.', good:'The hearth draws. Pip sleeps stretched out, like someone who expects to wake up warm.'},
   {k:'beds', name:'Raise sleeping benches', who:'dack', cost:{wood:6, fiber:4}, bad:'Everyone sleeps on wet straw on the bare earth.', hurt:'Dack sits up against a post all night instead.', good:'Benches off the ground and dry straw on them. Even Dack lies down.'}
 ];
+// What the player finds at each kind of place, in order: old statues, carvings and writing nobody can read. Things seen,
+// never explained. When a place has nothing new left, the next find comes from the road instead.
+const FINDS = {
+  water: [
+    'Behind the falling water there is a wall, and the wall is carved. Rows of marks from top to bottom, too regular to be cracks. You cannot read a stroke of it. Somebody stood here a long time to make them.',
+    'Two statues stand in the pool up to their knees, worn faceless. Each holds out a cupped hand. The water does not come out of the rock. It comes out of their hands.',
+    'Under the moss on the rim of the basin, the same short line of marks is cut again and again, all the way round. You filled the skins and counted it forty times.',
+    'One of the statues at the spring has had its head turned, long ago and on purpose, to face away from the old road.',
+    'The marks behind the falls are not all the same age. The lowest rows are worn nearly flat. The top row is sharp, and there is stone dust on the ledge under it.',
+    'You put your hand under a statue\'s hand to drink and saw it: a line of small marks cut into the cupped palm, where only someone drinking would ever look.',
+    'The pool is lower today, and there are steps under the water. They go down past where the light reaches.',
+    'The same short line of marks is on the basin rim, on the wall behind the falls, in the statues\' palms and on the first step under the water. You could draw it from memory now. You still cannot read it.'],
+  wood: [
+    'A stone figure stands in the grove with a tree grown clean through it. It was a person once, one arm raised, pointing uphill. The tree is very old. The statue is older.',
+    'Square holes in a rock face among the trees, in rows, each the size of a fist. Something was fitted there. Whatever it was has been taken out carefully, not broken.',
+    'A fallen column under the leaf litter, carved all round with writing that winds from one end to the other. You walked its length twice. It does not seem to have a beginning.',
+    'Deep in the grove the trees stand in straight lines. Nobody has planted here in living memory. Somebody did once, on a grid.',
+    'You walked where the stone figure in the grove is pointing. A hundred paces uphill there is a second one, pointing on.',
+    'The square holes in the rock face hum, very faintly, when the wind is in the north. You put your ear to one. It is not the wind.',
+    'The third pointing figure has no tree through it. Its raised arm is broken off, and the break is clean and pale. That break is not old.',
+    'At the middle of the grove, between the planted rows, there is a square of bare earth where nothing grows. Sight along the pointing figures and every one of them meets here.'],
+  food: [
+    'A ring of low stones in the meadow, each cut with one mark, no two the same. The grass inside the ring is a different green.',
+    'Under the turf where you dug: a floor of small coloured stones. It shows a figure lying on its back in a ring of stars, and people standing round it with their hands raised. You covered it over again.',
+    'A stone seat faces the empty valley, worn smooth by sitting. The writing on its back is cut deeper than any you have seen, as if this was the line they most wanted to last.',
+    'A statue lies face down in the meadow. It did not fall. It was laid there, and stones were set on its back.',
+    'The stone ring in the meadow has a gap. One stone is missing, and the hollow where it stood has not grassed over.',
+    'You uncovered more of the coloured floor. The people standing round the figure are not raising their hands in welcome. They are holding something shut.',
+    'Sit in the stone seat and you face a notch in the far ridge. At dusk the sun goes down exactly in it, and for a moment the deep-cut line on the seat is the only thing lit.',
+    'The statue laid face down has rope marks worn into its shoulders. They dragged it here from somewhere far off, and then made sure it would stay.'],
+  stone: [
+    'Nobody in camp dug this quarry. The cuts are straight as string and a hand deep, a thousand of them. Halfway up the face one block is cut free on five sides and was never taken.',
+    'A stair is cut into the quarry wall. It climbs to the shape of a doorway carved an arm deep into solid rock, and stops. There is nothing behind it. You knocked anyway.',
+    'Lines of writing run across the quarry face, higher than anyone could reach. Either they had ladders, or the floor was once much higher.',
+    'A half-carved giant lies in the quarry floor, still joined to the bedrock along its back. Only the hands are finished. They are open, palms up.',
+    'Each open palm of the half-carved giant holds a shallow bowl of rainwater. There are handprints in the dust around them. They are smaller than yours.',
+    'The doorway carved in the quarry wall has a seam down the middle that you did not see before. It is a hair wide and dead straight.'],
+  fiber: [
+    'Posts stand in the water in pairs, marching out from the bank until they go under. A walkway led somewhere out there. There is nothing out there now but water.',
+    'A stone head stands in the reeds, twice your height, sunk to the chin. Its eyes are open. Its mouth is carved shut with a row of small marks, like stitches, or like writing.',
+    'Flat stones along the bank, each cut with the same three signs. You find eleven. They are the right size, and the right distance apart, to be seats.',
+    'At low water you can see where the walkway posts lead: to a second stone head, far out, facing this one.',
+    'The stone head\'s mouth is not stitched. Up close the marks are writing, one short line, the same line each time. Whatever it says, they closed its mouth with it.'],
+  herbs: [
+    'The hedgerow grows along an old wall. Where the stones show, they are covered in writing so fine you could hide a line with your thumb. It goes on as far as the hedge does.',
+    'A niche in the old wall with a small stone figure in it, no bigger than Wren. Someone has left fresh flowers. Nobody in camp says it was them.',
+    'A stone tablet set in the wall, cracked across. One half is the writing you cannot read. The other half is a picture: a road, an arch, and beyond the arch, nothing carved at all.',
+    'The flowers in the niche have been changed again. This time there is a knotted cord laid beside them, tied in fives.',
+    'You followed the writing along the wall to where the hedge ends. The last line is unfinished. The chisel is still lying under it, rusted to the stone.'],
+  feverbark: [
+    'Two statues taller than the trees stand at the crossing, one each side of the road. Their faces have been chiselled off. The Tallymen have hung their knotted cords from what is left of the hands.'],
+  captive: [
+    'The Tallymen built their stockade against a much older wall. It is covered in rows of marks, four strokes and a slash, from the ground to the top. Theirs are the newest. They were not the first to count here.',
+    'Inside the stockade gate stands a statue the Tallymen have not defaced: a figure at a table, writing. They keep the ground around it swept.'],
+  road: [
+    'A milestone, half sunk beside the path. Under the moss the carving is rows of marks, four strokes and a slash. You have seen that mark before, cut into a door.',
+    'A coin in the mud, worn almost smooth. One face shows an arch. The other shows the same arch, broken. Somebody struck a coin of a ruin.',
+    'One standing stone in a field of frost, with bare wet ground all round its foot. It is warm under your palm.',
+    'A second milestone. It has one row of marks fewer than the last. They are counting down toward something.',
+    'From the high ground you can see the old road run on toward a notch in the mountains. Something there catches the last light. It is the right shape to be a door.']
+};
+const FIND_TOTAL = Object.values(FINDS).reduce((n, a) => n + a.length, 0);
+const findText = id => { const [k, i] = String(id).split(':'); return (FINDS[k] || [])[+i] || ''; };
+const nextFind = res => { for (const k of [res, 'road']){ const i = (FINDS[k] || []).findIndex((_, n) => !frags().includes(k + ':' + n)); if (i >= 0) return k + ':' + i; } return null; };
+// Character sheet. Attributes grow from what the player really does; levels give points to spend on perks.
+const ATTR = [
+  {k:'legs', name:'Legs', d:'Distance walked on tasks', val:() => S.stats.meters / 1000, steps:[0,2,5,10,18,30,45,65,90,120], fmt:v => fmtDist(v * 1000)},
+  {k:'arms', name:'Arms', d:'Workout reps done', val:() => S.stats.reps || 0, steps:[0,30,80,160,280,450,700,1000,1400,1900], fmt:v => Math.round(v) + ' reps'},
+  {k:'grit', name:'Grit', d:'Tasks finished', val:() => S.stats.tasks, steps:[0,3,8,15,25,40,60,85,115,150], fmt:v => v + ' tasks'},
+  {k:'lore', name:'Lore', d:'Old things found', val:() => frags().length, steps:[0,1,3,6,10,15,21,28,36,48], fmt:v => v + ' found'}
+];
+const PERKS = [
+  {k:'back', name:'Strong back', max:3, d:'Carry 1 more each trip, per rank.'},
+  {k:'wind', name:'Second wind', max:2, d:'Workouts need 10% fewer reps, per rank.'},
+  {k:'rest', name:'Earned rest', max:2, d:'Bank one more rest token, per rank. Each rank also hands you one now.'}
+];
 const RANKS = [[0,'Stranger'],[6,'Hauler'],[14,'Forager'],[24,'Scout'],[36,'Warden']];
 const MOVES = [{n:'jumping jacks', base:20}, {n:'squats', base:15}, {n:'push-ups', base:8}, {n:'high knees', base:30}];
 const TINT = {wood:'#B98A5A', water:'#66BDD8', food:'#6FC694', stone:'#A7B0B8', fiber:'#D8C56A', herbs:'#C58BD0'};
@@ -342,8 +433,16 @@ const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00') - new Date(a + 'T12
 /* ---------- derived standing ---------- */
 const standing = () => Object.values(S.trust).reduce((a, b) => a + b, 0);
 const rankIdx = () => { let i = 0; RANKS.forEach((r, n) => { if (standing() >= r[0]) i = n; }); return i; };
-const carry = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
-const carryName = () => carry() === 20 ? "Oona's woven pack" : carry() === 10 ? "Oona's sling" : 'Your two hands';
+const perks = () => S.perks || (S.perks = {});
+const frags = () => S.frags || (S.frags = []);
+const gear = () => S.built.loom && S.trust.oona >= 5 ? 20 : S.built.loom && S.trust.oona >= 2 ? 10 : 5;
+const carry = () => gear() + (perks().back || 0);
+const attrLvl = a => { const v = a.val(); let i = 0; while (i < a.steps.length - 1 && v >= a.steps[i + 1]) i++; return i + 1; };
+const xp = () => Math.round(S.stats.tasks * 10 + S.stats.meters / 100 + (S.stats.reps || 0) / 2 + S.stats.wins * 15 + frags().length * 5 + REPAIRS.filter(r => S.fixed[r.k]).length * 10);
+const lvlAt = n => 30 * n * (n - 1);
+const level = () => { const x = xp(); let n = 1; while (x >= lvlAt(n + 1)) n++; return n; };
+const points = () => level() - 1 - PERKS.reduce((t, k) => t + (perks()[k.k] || 0), 0);
+const carryName = () => gear() === 20 ? "Oona's woven pack" : gear() === 10 ? "Oona's sling" : 'Your two hands';
 const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the hut, on a bench you built' : S.trust.maren >= 3 ? 'The hut floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
 const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
 const needs = () => ({food:S.built.smoke ? 1 : 2, water:S.built.cistern ? 1 : 2, wood:1});
@@ -695,7 +794,7 @@ function startMission(){
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
 }
-const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1));
+const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1) * (1 - 0.1 * (perks().wind || 0)));
 function arrive(){
   const m = S.mission; buzz();
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
@@ -703,18 +802,20 @@ function arrive(){
     places()[pk] = {site:m.site, oneWay:m.oneWay, name:m.name, real:!!m.real, onTrail:!!m.onTrail, route:m.route || null, routeM:m.routeM || 0, found:today()};
     note('You found the ' + placeName(pk) + (m.name ? ' at ' + m.name : '') + '. It is on your map now, and it will be there next time.');
   }
+  { const f = nextFind(TASKS[m.id].res); if (f){ m.frag = f; frags().push(f); note((f.startsWith('road') ? 'On the way to the ' : 'At the ') + SITE[TASKS[m.id].res] + ': ' + findText(f)); } }
   if (TASKS[m.id].battle){ m.phase = 'battle'; m.reps = 0; m.bt0 = 0; }
   else m.phase = 'back';
   save(); render();
 }
 function endBattle(won){
   const m = S.mission; m.won = won; m.phase = 'back'; m.lastFix = pos ? {lat:pos.lat, lng:pos.lng, t:Date.now()} : null;
+  S.stats.reps = (S.stats.reps || 0) + (m.reps || 0);
   if (won) S.stats.wins++;
   buzz(); save(); render();
 }
 function unload(){
   const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
-  const before = {sleep:sleep(), carry:carry(), rank:rankIdx()};
+  const before = {sleep:sleep(), carry:carry(), rank:rankIdx(), lvl:level()};
   const notes = [];
   const speed = elapsed > 0 ? m.meters / elapsed : 0, simd = pos && pos.sim;
   let tr = T.tr, haul = Math.min(carry(), Math.max(1, Math.round(planned / 100)));
@@ -743,12 +844,13 @@ function unload(){
   { const N = neglect(); N.lastHelp = today(); N.stage = 0; }
   const steps = Math.round(m.meters / 0.78);
   S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
-  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed};
-  if (S.stats.tasks % 5 === 0 && neglect().rests < 3){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
+  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag};
+  if (S.stats.tasks % 5 === 0 && neglect().rests < 3 + (perks().rest || 0)){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
   S.mission = null;
   if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
   if (carry() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
   if (rankIdx() !== before.rank) note('Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
+  if (level() !== before.lvl) note('Something has changed in you. Level ' + level() + '. You have a point to spend on the You screen.');
   if (S.stats.tasks === 1) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
   newDay(); buzz();
   if (wake){ try { wake.release(); } catch {} wake = null; }
@@ -802,7 +904,7 @@ function worldBrief(){
   return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one hut, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
 The player is "the Stranger", who appeared from another world (ours), out of shape and wearing Crocs, and is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
 The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
-Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. Inside the hut, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
+Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the hut'}. What the Stranger has noticed about the old empire so far: ${frags().slice(-3).map(findText).join(' ') || 'nothing yet'} Nobody in camp can read the old writing or explain these things. They are uneasy about them, do not invent explanations, and would rather talk about the work. Inside the hut, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
 }
 function charRules(k){
   const p = PEOPLE[k], t = S.trust[k];
@@ -861,7 +963,7 @@ const INTRO = [
   {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into cold grass and stars',
    html:'<p>You are on the couch with a bag of chips on your chest, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>'},
   {img:'intro-wake', eye:'Somewhere else', alt:'You, flat on your back in frosted grass under a huge sky of stars',
-   html:'<p>When it stops you are lying in cold grass under a sky with no wires in it. No street, no hum, no light but stars.</p><p>You are out of breath from doing nothing, and all you have on your feet is a pair of Crocs.</p>'},
+   html:'<p>When it stops you are lying in cold grass under a sky with no wires in it. No street, no hum, no light but stars.</p><p>You are out of breath from doing nothing, and all you have on your feet is a pair of foam clogs.</p>'},
   {img:'intro-ridge', eye:'The ridge', alt:'You, trudging uphill through frosty grass toward a thread of smoke on a far ridge at dawn',
    html:'<p>By dawn you can see one thread of smoke on a far ridge. It is the only sign of anyone.</p><p>It is the longest walk you have taken in years. You stop four times. You keep going.</p>'},
   {img:'intro-spear', eye:'Hollow Ash', alt:'A woman in a worn cloak levels a spear at you while the camp watches from the fire',
@@ -1005,6 +1107,7 @@ function render(){
     el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
       <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. Your phone buzzes when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
+      ${!out && m.frag != null ? `<div class="frag"><p class="eyebrow">${String(m.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(m.frag))}</p></div>` : ''}
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
@@ -1050,7 +1153,7 @@ function render(){
     if (L){
       const T = TASKS[L.id];
       h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.rescue ? (L.freed ? PEOPLE[L.freed].name + ' is home' : 'Driven off at the stockade') : T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
-        <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p></div>`;
+        <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p>${L.frag != null ? `<div class="frag"><p class="eyebrow">${String(L.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(L.frag))}</p></div>` : ''}</div>`;
     }
     const arc = S.fever && !S.fever.done && !S.fever.failed, tk = takenList(), CS = campState();
     h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${tk.length ? 'The Tallymen have ' + names(tk) : arc ? 'Wren is burning up' : CS.mood === 'Marked' ? 'There is a mark on the hut door' : CS.mood === 'Watched' ? 'Scouts on the ridge' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2>
@@ -1187,6 +1290,21 @@ function renderCamp(){
       if (REPAIRS.every(x => S.fixed[x.k])){ addTrust('maren', 1); note('The hut is whole: roof, shutters, hearth and beds. Maren walked the length of it twice and then told you where you sleep tonight. Inside.'); }
       newDay(); render();
     }); }
+  { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
+    $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
+        <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
+      <ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
+        <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul>
+      <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>A hoodie, sweatpants and foam clogs from another world</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
+      <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'You earn one point each level. XP comes from tasks, distance, workouts, repairs and what you find.'}</p>
+      <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul>`;
+    $('sheet').querySelectorAll('button[data-perk]').forEach(btn => btn.onclick = () => {
+      const k = PERKS.find(q => q.k === btn.dataset.perk), n = perks()[k.k] || 0; if (points() < 1 || n >= k.max) return;
+      perks()[k.k] = n + 1; if (k.k === 'rest') neglect().rests++;
+      note('You took ' + k.name + (n ? ' again' : '') + '. ' + k.d.split(',')[0] + '.'); save(); render();
+    });
+    $('loreLine').textContent = frags().length ? frags().length + ' of ' + FIND_TOTAL + ' found. Each place has its own, and you find one each time you reach it.' : 'Nothing yet. Each time you reach a place on a task, you find something left by whoever was here before. Nobody can read any of it.';
+    $('lore').innerHTML = frags().map(i => `<li>${esc(findText(i))}</li>`).join(''); }
   $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
   { const N = neglect();
     $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with Maren\'s leave' : 'Tell Maren you need two rest days (' + N.rests + ' banked)'}</button>
