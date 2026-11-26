@@ -58,4 +58,25 @@ pushStatus = 410; assert.equal(await runNudges(env, new Date('2026-11-26T19:50:0
 assert.equal((await call('/test', {endpoint:sub.endpoint})).status, 404);
 // nothing stored but the push address, zone, hours and quiet time
 assert.deepEqual(Object.keys(rec).sort(), ['from', 'quietUntil', 'sub', 'to', 'tz']);
+
+// ---- villager voices through the server's own key ----
+const good = {system:'You are Pip.', messages:[{role:'user', content:'Hello'}]};
+assert.equal((await call('/talk', good)).status, 503, 'no key set: relay is off');
+assert.equal((await (await call('/', null, undefined, 'GET')).json()).talk, false);
+env.ANTHROPIC_API_KEY = 'sk-test'; env.TALK_PER_PLAYER = '2';
+assert.equal((await (await call('/', null, undefined, 'GET')).json()).talk, true);
+assert.equal((await call('/talk', good, 'https://evil.example')).status, 403);
+assert.equal((await call('/talk', {system:'x', messages:[{role:'system', content:'hi'}]})).status, 400);
+assert.equal((await call('/talk', {system:'x'.repeat(20000), messages:good.messages})).status, 400);
+let mode = 'ok'; sent.length = 0;
+globalThis.fetch = async (url, init) => { sent.push({url, init});
+  if (mode === 'reject-fallback' && JSON.parse(init.body).fallbacks) return new Response('{}', {status:400});
+  return new Response(JSON.stringify({stop_reason:'end_turn', content:[{type:'thinking', thinking:''}, {type:'text', text:'Forty-one steps.'}], usage:{}}), {status:200}); };
+r = await call('/talk', good); assert.equal(r.status, 200);
+assert.deepEqual(await r.json(), {stop_reason:'end_turn', content:[{type:'text', text:'Forty-one steps.'}]});
+const q = sent[0]; assert.equal(q.url, 'https://api.anthropic.com/v1/messages'); assert.equal(q.init.headers['x-api-key'], 'sk-test');
+const qb = JSON.parse(q.init.body); assert.equal(qb.model, 'claude-opus-5-5'); assert.equal(qb.fallbacks, 'default'); assert.equal(qb.max_tokens, 2000); assert.ok(!('temperature' in qb));
+mode = 'reject-fallback'; sent.length = 0; r = await call('/talk', good); assert.equal(r.status, 200); assert.equal(sent.length, 2); assert.ok(!JSON.parse(sent[1].init.body).fallbacks);
+r = await call('/talk', good); assert.equal(r.status, 429, 'third reply of the day for this player is refused'); assert.deepEqual(await r.json(), {error:'daily_cap'});
+assert.ok(![...kv.values()].some(v => String(v).includes('Hello') || String(v).includes('sk-test')), 'no words and no key in storage');
 console.log('all push checks passed');

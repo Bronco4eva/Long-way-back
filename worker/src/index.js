@@ -7,6 +7,10 @@ const CONTACT = 'https://bronco4eva.github.io/Long-way-back/';
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
 const MAX_PHONES = 200;
 
+// Villager voices for players who have no key of their own. The key is a secret on this server (ANTHROPIC_API_KEY)
+// and never reaches a phone. Caps are counted per day against a scrambled internet address; no words are stored.
+const TALK = {perPlayer:40, everyone:400, maxSystem:16000, maxTurns:30, maxTurnChars:2000, maxTokens:2000, model:'claude-opus-5-5'};
+
 const LINES = [
   'You have been down a whole hour. Up. Once round the camp.',
   'My knee set like this because I sat a winter out. Get up and walk the fence.',
@@ -102,6 +106,36 @@ export async function runNudges(env, now = new Date()){
   return sent;
 }
 
+const day = () => new Date().toISOString().slice(0, 10);
+function validTalk(j){
+  return j && typeof j.system === 'string' && j.system.length > 0 && j.system.length <= TALK.maxSystem
+    && Array.isArray(j.messages) && j.messages.length > 0 && j.messages.length <= TALK.maxTurns
+    && j.messages.every(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.length > 0 && m.content.length <= TALK.maxTurnChars);
+}
+async function callClaude(env, j, withFallback){
+  const headers = {'content-type':'application/json', 'x-api-key':env.ANTHROPIC_API_KEY, 'anthropic-version':'2026-10-21'};
+  const body = {model:env.TALK_MODEL || TALK.model, max_tokens:TALK.maxTokens, system:j.system, messages:j.messages.map(m => ({role:m.role, content:m.content})), output_config:{effort:'low'}};
+  // If a safety check declines a request, let Anthropic hand it to another model instead of failing.
+  if (withFallback){ headers['anthropic-beta'] = 'server-side-fallback-2026-07-01'; body.fallbacks = 'default'; }
+  return fetch('https://api.anthropic.com/v1/messages', {method:'POST', headers, body:JSON.stringify(body)});
+}
+export async function talk(request, env, j){
+  if (!env.ANTHROPIC_API_KEY) return [{error:'no_key'}, 503];
+  if (!validTalk(j)) return [{error:'bad request'}, 400];
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown', d = day();
+  const mine = 'talk:' + d + ':' + hex(await crypto.subtle.digest('SHA-256', enc.encode(d + '|' + ip))).slice(0, 24), all = 'talk:' + d + ':all';
+  const [nMine, nAll] = (await Promise.all([env.SUBS.get(mine), env.SUBS.get(all)])).map(v => +v || 0);
+  if (nMine >= (+env.TALK_PER_PLAYER || TALK.perPlayer) || nAll >= (+env.TALK_EVERYONE || TALK.everyone)) return [{error:'daily_cap'}, 429];
+  await Promise.all([env.SUBS.put(mine, String(nMine + 1), {expirationTtl:2 * 86400}), env.SUBS.put(all, String(nAll + 1), {expirationTtl:2 * 86400})]);
+  let r = await callClaude(env, j, true);
+  if (r.status === 400) r = await callClaude(env, j, false);   // in case the fallback option is not accepted
+  if (r.status === 401 || r.status === 403) return [{error:'server_key_rejected'}, 502];
+  if (r.status === 429 || r.status === 529) return [{error:'busy'}, 503];
+  if (!r.ok) return [{error:'upstream_error'}, 502];
+  const out = await r.json();
+  return [{stop_reason:out.stop_reason, content:(out.content || []).filter(b => b.type === 'text').map(b => ({type:'text', text:b.text}))}, 200];
+}
+
 function reply(body, status, origin){
   const h = {'content-type':'application/json', 'vary':'Origin'};
   if (origin === GAME_ORIGIN){ h['access-control-allow-origin'] = origin; h['access-control-allow-methods'] = 'GET, POST, OPTIONS'; h['access-control-allow-headers'] = 'content-type'; h['access-control-max-age'] = '86400'; }
@@ -112,11 +146,13 @@ export default {
   async fetch(request, env){
     const url = new URL(request.url), origin = request.headers.get('Origin') || '';
     if (request.method === 'OPTIONS') return reply({}, 200, origin);
-    if (request.method === 'GET' && url.pathname === '/') return reply({ok:true, what:'The Long Way Back reminders'}, 200, origin);
+    if (request.method === 'GET' && url.pathname === '/') return reply({ok:true, what:'The Long Way Back reminders', talk:!!env.ANTHROPIC_API_KEY}, 200, origin);
     if (request.method === 'GET' && url.pathname === '/key') return reply({key:(await vapid(env)).pub}, 200, origin);
     if (request.method !== 'POST') return reply({error:'not found'}, 404, origin);
     if (origin !== GAME_ORIGIN) return reply({error:'only the game may call this'}, 403, origin);
     let j; try { j = await request.json(); } catch { return reply({error:'bad request'}, 400, origin); }
+
+    if (url.pathname === '/talk'){ const [body, status] = await talk(request, env, j); return reply(body, status, origin); }
 
     if (url.pathname === '/subscribe'){
       if (!validSub(j.sub) || !hourOk(j.from) || !hourOk(j.to) || j.from >= j.to || localHour(String(j.tz)) < 0) return reply({error:'bad request'}, 400, origin);
