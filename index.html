@@ -141,7 +141,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   </div>
 
   <div class="gut screen" data-tab="camp" hidden>
-    <img class="scene" src="art/village.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true">
+    <span id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
     <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
     <section class="panel" id="insideBox"></section>
     <section>
@@ -462,6 +462,10 @@ const xp = () => Math.round(S.stats.tasks * 10 + S.stats.meters / 100 + (S.stats
 const lvlAt = n => 30 * n * (n - 1);
 const level = () => { const x = xp(); let n = 1; while (x >= lvlAt(n + 1)) n++; return n; };
 const points = () => level() - 1 - PERKS.reduce((t, k) => t + (perks()[k.k] || 0), 0);
+// Which village picture to show. Each thing built, and the longhouse repairs at two and at four, moves it on one stage.
+const STAGE_ALT = ['', 'a run-down longhouse and one fire', 'a fire ring and a lean-to by the longhouse', 'a wattle fence round the yard', 'a granary and fish traps by the stream', 'the longhouse mended, with a well', 'a weaving house and a vegetable plot', 'a smithy by the stream', 'more longhouses, animal pens and barley', 'a full village', 'the road paved in stone', 'a full village behind timber defenses', 'the village rebuilt in stone'];
+const villageStage = () => { const fx = REPAIRS.filter(r => S.fixed[r.k]).length, n = BUILDS.filter(b => S.built[b.k]).length + (fx >= 2 ? 1 : 0) + (fx >= 4 ? 1 : 0); return n >= 8 ? 11 : n + 1; };
+const villagePic = cls => pic('village-' + villageStage(), cls, 'Hollow Ash at dusk: ' + STAGE_ALT[villageStage()]);
 const carryName = () => gear() === 20 ? "Oona's woven pack" : gear() === 10 ? "Oona's sling" : 'Your two hands';
 const sleep = () => S.trust.maren >= 6 && S.built.leanto ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the longhouse, on a bench you built' : S.trust.maren >= 3 ? 'The longhouse floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
 const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
@@ -1103,7 +1107,7 @@ function render(){
     };
     if (introStep) $('introBack').onclick = () => { introStep--; render(); window.scrollTo(0, 0); };
   } else if (!S.home){
-    el.innerHTML = `${pic('village', 'scene', 'Hollow Ash at dusk')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
+    el.innerHTML = `${villagePic('scene')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
       <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
       ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p><button id="useRough" hidden>Use this rough spot anyway</button><p class="small muted" id="gpsDiag"></p>' : ''}
       ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
@@ -1134,7 +1138,7 @@ function render(){
   } else if (m){
     const T = TASKS[m.id], out = m.phase === 'out';
     const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
-    el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
+    el.innerHTML = `${out ? pic('s-' + artFor(T), 'scene strip', 'The ' + SITE[T.res]) : villagePic('scene strip')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
       <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. Your phone buzzes when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
       ${!out && m.frag != null ? `<div class="frag"><p class="eyebrow">${String(m.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(m.frag))}</p></div>` : ''}${!out && m.item && item(m.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(m.item).name)}.</b> ${esc(item(m.item).found)}</p><p class="small">${item(m.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(m.item).who].name + '. '}Get it home and it counts.</p></div>` : ''}
@@ -1334,6 +1338,7 @@ function renderCamp(){
       perks()[k.k] = n + 1; if (k.k === 'rest') neglect().rests++;
       note('You took ' + k.name + (n ? ' again' : '') + '. ' + k.d.split(',')[0] + '.'); save(); render();
     });
+    { const c = $('campPic'), st = String(villageStage()); if (c && c.dataset.st !== st){ c.dataset.st = st; c.innerHTML = villagePic('scene'); } }
     $('loreLine').textContent = frags().length ? frags().length + ' of ' + FIND_TOTAL + ' found. Each place has its own, and you find one each time you reach it.' : 'Nothing yet. Each time you reach a place on a task, you find something left by whoever was here before. Nobody can read any of it.';
     $('lore').innerHTML = frags().map(i => `<li>${esc(findText(i))}</li>`).join(''); }
   $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
