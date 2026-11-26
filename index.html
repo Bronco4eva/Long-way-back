@@ -247,7 +247,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <h2>Villager voices</h2>
       <p class="small" id="aiStatus"></p>
       <div id="keyBox" style="display:flex;flex-direction:column;gap:.6rem">
-        <label for="keyInput">Claude API key</label>
+        <label for="keyInput">Your own Claude API key (optional)</label>
         <input type="password" id="keyInput" autocomplete="off" placeholder="sk-ant-...">
         <label for="modelSel">Voice quality</label>
         <select id="modelSel">
@@ -690,14 +690,14 @@ const LOCHELP = {
 const platform = () => { const u = navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1) ? (/CriOS/.test(u) ? 'ioschrome' : 'ios') : /Android/.test(u) ? 'android' : 'desktop'; };
 const GMAPS_KEY = 'AIzaSyABeK9cERD8PMb_gALajr4ASzRW7Weap60';  // Google Maps Embed API key, locked to this site's address. Empty = OpenStreetMap picture.
 const PRIVACY = `<details class="lochelp priv"><summary>We do not track your location. Details</summary><ol>
-  <li>There is no account and no game server. The people who made this game never receive where you are or where you live.</li>
+  <li>There is no account. The game's one small server only sends walk reminders and carries villager talk, as described below. The people who made this game never receive where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
   <li>To pick a destination, the game asks OpenStreetMap's public map service for parks and trails around a rounded point about half a mile (1 km) wide, not your exact position.</li>
   <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your home to the destination. Your exact home spot is not sent.</li>
   <li>The map in the game is drawn on your phone. If you tap the small map icon or "Open in Google Maps", Google receives where you are and the destination so it can draw the route. Nothing goes to Google unless you tap one of those.</li>
   
   <li>If you turn on Tobiah's calls, a small reminder server run by the game's maker keeps the address your phone uses for notifications, your time zone and the hours you chose, so it can call you. It never receives your location, your home or your progress, and turning the calls off deletes it.</li>
-  <li>The villager AI voices never receive your location, your parks or your home.</li>
+  <li>When a villager talks back, what you typed and the state of your camp go to Anthropic (through the game's server, unless you added a key of your own), the company that makes the voices, and the reply comes back. The server does not keep the words. It keeps a count of replies per day against a scrambled form of your internet address, so one person cannot use everyone's share. The voices never receive your location, your parks or your home.</li>
   <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
 function locHelp(open){
   const mine = platform();
@@ -1133,12 +1133,15 @@ function readSaveCode(text){
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
 let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
 let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
-const aiOn = () => !!(sampleFn || apiKey);
+let relayOn = store.get('lwb-relay') === '1';   // the game's own server can speak for players with no key
+const aiOn = () => !!(sampleFn || apiKey || relayOn);
 if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
 function aiErr(e){
   const c = e && e.code;
   if (c === 'not_granted' || c === 'sampling_disabled') return 'Claude is not allowed for this page, so the villagers keep to their written lines.';
   if (c === 'rate_limited') return 'Too many words too quickly. Try again in a while.';
+  if (c === 'daily_cap') return 'The camp has talked itself out for today. They will have more to say tomorrow.';
+  if (c === 'relay_off') return 'The villagers cannot find their words right now. Try again later.';
   if (c === 'refused') return 'They will not speak of that.';
   if (c === 'bad_key') return 'That API key was rejected. Check it under Villager voices.';
   return 'The words did not come. Try again.';
@@ -1148,9 +1151,12 @@ async function askAI(rules, turns, wantJson){
     const input = [{role:'user', content:rules}, ...turns], opts = {cache:false, modelTier:'quick'};
     return wantJson ? await sampleFn.json(input, opts) : (await sampleFn(input, opts)).text;
   }
-  const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
+  const r = apiKey ? await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
     headers:{'content-type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2026-10-21', 'anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model, max_tokens:2000, system:rules, messages:turns, output_config:{effort:'low'}})});
+    body:JSON.stringify({model, max_tokens:2000, system:rules, messages:turns, output_config:{effort:'low'}})})
+    : await fetch(PUSH_URL + '/talk', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({system:rules, messages:turns})});
+  if (!apiKey && r.status === 429) throw {code:'daily_cap'};
+  if (!apiKey && r.status === 503) throw {code:'relay_off'};
   if (r.status === 401 || r.status === 403) throw {code:'bad_key'};
   if (r.status === 429) throw {code:'rate_limited'};
   if (!r.ok) throw {code:'upstream_error'};
@@ -1665,7 +1671,7 @@ function renderCamp(){
   $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
   $('ideaPanel').hidden = !aiOn();
   if (!$('ideaWho').options.length) $('ideaWho').innerHTML = Object.entries(PEOPLE).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('');
-  $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
+  $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : relayOn ? 'The villagers can talk back. Tap Talk on anyone on the People tab. There is a daily limit on how much they will say, shared by everyone who plays. You do not need a key of your own.' : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
   $('keyBox').hidden = !!sampleFn; $('keyClear').hidden = !apiKey; $('modelSel').value = model;
   $('unitBtn').textContent = units === 'mi' ? 'Switch to kilometres' : 'Switch to miles';
   $('moveHome').hidden = !S.home || !!S.mission;
@@ -1730,6 +1736,7 @@ if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
 }
 if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; try { history.replaceState(null, '', location.pathname); } catch {} }
 boot(); pushRefresh();
+if (PUSH_URL) fetch(PUSH_URL + '/').then(r => r.json()).then(j => { const on = !!(j && j.talk); if (on !== relayOn){ relayOn = on; store.set('lwb-relay', on ? '1' : '0'); render(); } }).catch(() => {});
 { const got = checkWalk(); if (got && got.earned){ shortcutNews = 'Round walked while you were away. Tobiah nodded.'; render(); } }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.walk){ const got = checkWalk(); if (got){ shortcutNews = got.earned ? 'Round walked. Tobiah nodded.' : 'Round walked.'; render(); } } });
 window.__lwb = {get S(){ return S; }, newDay, render};
