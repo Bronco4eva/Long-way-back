@@ -987,6 +987,7 @@ function render(){
     const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
     el.innerHTML = `${pic(out ? 's-' + artFor(T) : 'village', 'scene strip', out ? 'The ' + SITE[T.res] : 'Hollow Ash')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
+      <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. Your phone buzzes when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
