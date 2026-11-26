@@ -919,6 +919,12 @@ function updateCompass(){
   box.classList.toggle('on', on);
   line.textContent = on ? 'That is the way. Walk where the arrow points.' : rel < 160 ? 'Turn right until the arrow points straight up.' : rel > 200 ? 'Turn left until the arrow points straight up.' : 'It is behind you. Turn around.';
 }
+// One plain line on what a task asks of the player, shown on the task card, the task detail and the walking screen.
+function howTo(T){
+  const mid = T.battle === 'dare' ? 'do a short workout to beat the dare' : T.battle ? 'do a short workout to hold your ground' : 'your phone buzzes when you reach it';
+  const gain = T.rescue ? 'You walk one captive home.' : T.arc ? 'You carry the feverbark home.' : 'You bring back up to ' + carry() + ' ' + RES[T.res].toLowerCase() + ' for the stores.';
+  return 'What to do: walk to the ' + SITE[T.res] + ', ' + mid + ', then walk home.' + (T.battle ? ' ' : ' No workout. ') + gain;
+}
 function taskRow(id, arc){
   const T = TASKS[id], done = S.board.done[id];
   if (T.rescue){
@@ -926,12 +932,14 @@ function taskRow(id, arc){
     return `<li class="arc"><div class="thead">${pic('p-' + tk[0], 'face sm')}<div class="who"><h3>Bring ${PEOPLE[tk[0]].name} back from the stockade</h3><span class="tag fight">Contested</span></div></div>
     <p class="small">The Tallymen hold ${names(tk)} in their stockade. Maren cannot spare anyone to go. Walk there, break the guard, and walk ${PEOPLE[tk[0]].name} home.${tk.length > 1 ? ' One trip brings one of them back.' : ''}</p>
     <p class="small muted num">From Maren. About ${fmtDist(T.km * 1000)} round trip. Held ${held < 1 ? 'since last night' : held + (held === 1 ? ' day' : ' days')}.</p>
+    <p class="small howto">${howTo(T)}</p>
     <button data-t="rescue" class="primary">Go and get ${PEOPLE[tk[0]].name}</button></li>`;
   }
   return `<li class="${arc ? 'arc' : ''}">
     <div class="thead">${pic('p-' + T.g, 'face sm')}<div class="who"><h3>${T.t}</h3>${done ? '<span class="tag done">Done</span>' : T.battle ? `<span class="tag fight">${T.battle === 'dare' ? 'Dare' : 'Contested'}</span>` : ''}</div></div>
     <p class="small">${T.d}</p>
     <p class="small muted num">From ${PEOPLE[T.g].name}. About ${fmtDist(T.km * 1000)} round trip${arc ? '. ' + (feverLeft() === 1 ? 'Last day.' : feverLeft() + ' days left.') : '.'}</p>
+    ${done ? '' : `<p class="small howto">${howTo(T)}</p>`}
     ${done ? '' : `<button data-t="${id}" class="${arc ? 'primary' : ''}">Take this task</button>`}</li>`;
 }
 function render(){
@@ -1019,6 +1027,7 @@ function render(){
       <p><b>${o.name ? esc(o.name) : o.onTrail ? 'A trail' : o.real ? 'An unnamed park' : 'A spot'}</b>, ${fmtDist(o.oneWay)} ${compass(bearing(S.home, o.site))} of camp. ${o.routeM ? 'About ' + fmtDist(o.routeM * 2) + ' there and back on foot.' : fmtDist(o.oneWay * 2) + ' there and back in a straight line, more by road.'}</p>
       ${radarBox(o.route ? 'Blue dots are the walking path from camp.' : practice ? 'Practice ground.' : 'The dashed line is the straight direction. The walking path appears here when it loads.')}
       <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.onTrail ? 'This spot is on a mapped trail.' : o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} ${T.rescue ? '' : 'You can carry ' + carry() + ' back.'}</p>
+      <p class="small howto">${howTo(T)}</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">${o.known ? 'Scout a new ' + placeName(placeKey(T)) : 'Find another place'}</button></div>
       ${practice ? '' : fixBox(T)}
       <button class="quiet" id="back">Back to the board</button>`;
