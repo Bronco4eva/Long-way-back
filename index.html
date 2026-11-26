@@ -98,6 +98,12 @@ canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--
 .bar{height:8px;background:var(--raised);border:1px solid var(--line);border-radius:2px;overflow:hidden} .bar i{display:block;height:100%;background:var(--ember)}
 .attrs{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.75rem} .attrs b{font:400 1.75rem/1 var(--display)} .attrs .bar i{background:var(--moss)}
 .perks{list-style:none;margin:.4rem 0 0;padding:0} .perks li{padding:.7rem 0;border-top:2px solid var(--line);display:flex;gap:.75rem;align-items:center;justify-content:space-between} .perks li > div{min-width:0}
+.slots{list-style:none;margin:.5rem 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.slot{width:100%;min-height:5.25rem;padding:.45rem .5rem;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.15rem;text-align:left;background:var(--raised);color:var(--ink);border:2px solid var(--line);border-radius:4px;font:inherit;cursor:pointer}
+.slot .lab{font:400 .9375rem var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)} .slot .nm{font-size:.875rem;line-height:1.2;overflow-wrap:anywhere} .slot .fx{font-size:.75rem;color:var(--moss);font-variant-numeric:tabular-nums;margin-top:auto}
+.slot.empty{background:transparent;border-style:dashed} .slot.empty .nm{color:var(--muted)} .slot.on{border-color:var(--ember)}
+.pack{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.4rem} .pack button{min-height:2.75rem;padding:.3rem .7rem;background:var(--raised);color:var(--ink);border:2px solid var(--line);border-radius:4px;font:inherit;font-size:.875rem;cursor:pointer} .pack button.on{border-color:var(--ember)}
+.slotinfo{margin-top:.6rem;padding:.2rem 0 .2rem .75rem;border-left:3px solid var(--ember);min-height:3.2rem} .slotinfo .fx{color:var(--moss)}
 .cost{font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .built{color:var(--moss);font:400 1.25rem var(--display);white-space:nowrap}
 .journal li{padding:.55rem 0;border-top:2px solid var(--line);font-family:var(--story);font-size:.9375rem}
@@ -442,6 +448,32 @@ const ITEMS = [
   {k:'boots', at:'herbs', n:4, name:'Marching boots', found:'Under the cracked tablet, wrapped in oiled hide: a pair of boots with nailed soles, stiff but whole. They fit, near enough.', who:'you', carry:2, does:'Carry 2 more each trip. The foam clogs are retired.'}
 ];
 const item = k => ITEMS.find(i => i.k === k);
+// Gear slots on the You tab. Story things do nothing to the numbers; found things keep the effects they already had.
+// Nothing here is saved: every slot is worked out from what the player has already found and built.
+const TOOL_SLOTS = [['water','flask','Flask'], ['wood','hatchet','Axe'], ['food','sickle','Sickle'], ['stone','chisel','Chisel'], ['fiber','reedknife','Reed knife']];
+const POCKETS = [
+  {k:'rope', name:'Rope', d:'A coil of camp rope. Maren put it in your hands on the first day.'},
+  {k:'skin', name:'Waterskin', d:'Half full when Maren gave it to you. It is yours to keep filled.'},
+  {k:'phone', name:'Phone', d:'Almost out of charge and no signal anywhere. It is the only thing here that remembers where you came from.'},
+  {k:'key', name:'House key', d:'It opens a door that is a very long way from here.'},
+  {k:'gum', name:'Half a pack of gum', d:'Mint. Nobody in Hollow Ash has seen anything like it.'},
+  {k:'receipt', name:'Takeaway receipt', d:'Proof that you once had dinner brought to the couch.'},
+  {k:'remote', name:'TV remote', d:'It was in your hand when you fell asleep. It does nothing here.'}
+];
+const gearSlots = () => { const has = k => items().includes(k), it = k => item(k), from = k => 'Found at the ' + SITE[it(k).at] + '. ';
+  const worn = [
+    {k:'head', lab:'Head', empty:'Nothing on your head yet.'},
+    {k:'body', lab:'Body', name:'Hoodie and sweatpants', d:'What you fell asleep in. The only clothes from home you have.'},
+    {k:'back', lab:'Back', name:'Tallyman\'s cloak', d:'Maren had you take it. It keeps the wind off, and people look twice when they see it.'},
+    has('staff') ? {k:'hand', lab:'Hand', name:it('staff').name, fx:'10% fewer reps', d:from('staff') + it('staff').does} : {k:'hand', lab:'Hand', empty:'Empty. A good stick would help. One of the groves has something if you keep going back.'},
+    {k:'belt', lab:'Belt', name:'Belt knife', d:'From Maren. Short, plain and sharp.'},
+    has('boots') ? {k:'feet', lab:'Feet', name:it('boots').name, fx:'+2 carry', d:from('boots') + it('boots').does} : {k:'feet', lab:'Feet', name:'Foam clogs', d:'From another world, and not made for this one. Proper boots would let you carry more.'}
+  ];
+  const tools = TOOL_SLOTS.map(([res, k, lab]) => has(k) ? {k, lab, name:it(k).name, fx:'+' + it(k).bonus[1] + ' ' + RES[res].toLowerCase(), d:from(k) + it(k).does}
+    : {k, lab, empty:'Empty. Something for this turns up at the ' + SITE[res] + ' if you keep going back.'});
+  const bag = {k:'bag', lab:'Carry', name:carryName(), fx:carry() + ' a trip', d:'How you get things home. ' + (gear() === 20 ? 'Oona wove this pack for you.' : gear() === 10 ? 'Oona made you this sling. A proper pack comes with more of her trust.' : 'Oona can make you something better once there is a loom and she trusts you.')};
+  return worn.concat(tools, bag); };
+let openSlot = null;
 // Character sheet. Attributes grow from what the player really does; levels give points to spend on perks.
 const ATTR = [
   {k:'legs', name:'Legs', d:'Distance walked on tasks', val:() => S.stats.meters / 1000, steps:[0,2,5,10,18,30,45,65,90,120], fmt:v => fmtDist(v * 1000)},
@@ -1438,14 +1470,19 @@ function renderCamp(){
         g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } }; });
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
+    const slots = gearSlots(), sel = slots.concat(POCKETS).find(g => g.k === openSlot), given = kit(i => i.who !== 'you');
     $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
         <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
       <ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
         <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul>
-      <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>${items().includes('boots') ? 'A hoodie, sweatpants and a dead soldier\'s marching boots' : 'A hoodie, sweatpants and foam clogs from another world'}</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
-      <p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Keep going back to the same places. Old tools and useful things turn up there, some for you and some for the camp.</p>'}
+      <p class="eyebrow" style="margin-top:1rem">Gear</p><ul class="slots">${slots.map(g => `<li><button class="slot${g.name ? '' : ' empty'}${openSlot === g.k ? ' on' : ''}" data-slot="${g.k}" aria-pressed="${openSlot === g.k}"><span class="lab">${g.lab}</span><span class="nm">${esc(g.name || 'Empty')}</span>${g.fx ? `<span class="fx">${esc(g.fx)}</span>` : ''}</button></li>`).join('')}</ul>
+      <p class="eyebrow" style="margin-top:1rem">In your pockets</p><ul class="pack">${POCKETS.map(g => `<li><button class="${openSlot === g.k ? 'on' : ''}" data-slot="${g.k}" aria-pressed="${openSlot === g.k}">${esc(g.name)}</button></li>`).join('')}</ul>
+      <div class="slotinfo" aria-live="polite">${sel ? `<b>${esc(sel.name || sel.lab + ': empty')}</b>${sel.fx ? ` <span class="small fx num">${esc(sel.fx)}</span>` : ''}<div class="small">${esc(sel.d || sel.empty)}</div>` : '<span class="small muted">Tap a slot or a pocket to see what it is and what it does.</span>'}</div>
+      <dl class="status" style="margin-top:.9rem"><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
+      <p class="eyebrow" style="margin-top:1rem">Given to the camp</p>${given.length ? `<ul class="perks kit">${given.map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${PEOPLE[i.who].name} has it</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul>` : '<p class="small muted">Nothing yet. Some of what you find at the old places is for the camp, and you hand it over when you get home.</p>'}<p class="small muted num">${items().length} of ${ITEMS.length} useful things found. Keep going back to the same places.</p>
       <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'You earn one point each level. XP comes from tasks, distance, workouts, repairs and what you find.'}</p>
       <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul>`;
+    $('sheet').querySelectorAll('button[data-slot]').forEach(btn => btn.onclick = () => { openSlot = openSlot === btn.dataset.slot ? null : btn.dataset.slot; render(); });
     $('sheet').querySelectorAll('button[data-perk]').forEach(btn => btn.onclick = () => {
       const k = PERKS.find(q => q.k === btn.dataset.perk), n = perks()[k.k] || 0; if (points() < 1 || n >= k.max) return;
       perks()[k.k] = n + 1; if (k.k === 'rest') neglect().rests++;
