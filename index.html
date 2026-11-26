@@ -1,5 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
 <title>The Long Way Back</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="art/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0D1215">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Jersey+15&family=VT323&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
 <style>
@@ -180,10 +186,13 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
     </section>
     <section class="panel">
       <div class="thead"><img class="face sm" src="art/p-tobiah.jpg" alt="" onerror="this.hidden=true"><h2>Tobiah's rounds</h2></div>
-      <p class="small muted">Tobiah sat out one winter with his knee and it never came right. His rule for you: do not stay down for a whole hour. Every hour of the day in which you get up and walk at least 250 steps is one round of the camp. Each round counts as a chore done, and the fourth round of a day earns his trust and a bundle of herbs.</p>
+      <p class="small muted">Tobiah sat out one winter with his knee and it never came right. His rule for you: do not stay down for a whole hour. Every hour of the day in which you get up and walk a round of the camp counts as a chore done, and the fourth round of a day earns his trust and a bundle of herbs. A round is three minutes on your feet.</p>
       <div class="rounds" id="roundPips" role="img"></div>
       <p class="small num" id="roundLine"></p>
-      <details class="lochelp"><summary>Set this up on your iPhone</summary><div id="roundHelp"></div></details>
+      <div id="walkBox" style="display:flex;flex-direction:column;gap:.4rem"></div>
+      <h3 style="margin-top:1rem">Tobiah calls you</h3>
+      <div id="pushBox" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      <details class="lochelp"><summary>Count real steps from Health instead (Safari only)</summary><div id="roundHelp"></div></details>
     </section>
   </div>
 
@@ -249,6 +258,15 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
         <div class="row"><button class="grow" id="keySave">Save key</button><button class="quiet grow" id="keyClear">Remove key</button></div>
         <p class="small muted">The key is kept only in this browser and is sent only to Anthropic when a villager speaks. Set a monthly spend limit on the account that owns it.</p>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Carry your save to another place</h2>
+      <p class="small muted">The game on your Home Screen and the game in Safari keep separate saves. Copy your save here, open the other one, and bring it in there. Your API key is not part of it.</p>
+      <div class="row"><button id="saveOut">Copy my save</button></div>
+      <label for="saveIn">A save copied from somewhere else</label>
+      <textarea id="saveIn" rows="2" placeholder="LWB1:..." style="width:100%"></textarea>
+      <div class="row"><button class="quiet" id="saveInBtn">Bring this save in</button></div>
+      <p class="small num" id="saveLine"></p>
     </section>
     <section class="row">
       <button class="quiet" id="unitBtn"></button>
@@ -481,7 +499,7 @@ const blank = () => ({intro:false, home:null, first:today(), seen:today(),
   trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
   stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{}, v:2,
   board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
-  journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}, rounds:{date:'', hours:{}, paid:0}});
+  journal:[], chat:{}, ideas:[], stats:{meters:0, tasks:0, wins:0, steps:0}, stepLog:{date:'', steps:0, marks:0}, rounds:{date:'', hours:{}, paid:0}, walk:null});
 // Saves from before the build list followed the picture: keep the loom, and carry over the count of other things built.
 function migrate(j){
   if (j.v >= 2) return j;
@@ -996,7 +1014,7 @@ function logSteps(n){
 }
 
 /* Tobiah's rounds: steps for each hour of today, handed in by a phone shortcut. An hour with enough steps is one round. */
-const ROUND = {steps:250, from:6, to:21, cap:8, bonusAt:4};
+const ROUND = {steps:250, from:6, to:21, cap:8, bonusAt:4, walkMs:180000, walkKeep:30 * 60000};
 const ROUNDHELP = `<p class="small muted">Two small shortcuts in the iPhone Shortcuts app do this. One opens the game and hands it your steps from Health. The other checks on you each hour and tells you to get up. These steps have not been tried on a real phone yet, so tell us where they go wrong.</p>
   <p class="small"><b>1. The game opener</b></p><ol>
   <li>Open Shortcuts, tap +, and name the new shortcut The Long Way Back.</li>
@@ -1037,6 +1055,78 @@ function logHours(hours){
   const total = Object.values(r.hours).reduce((a, b) => a + b, 0);
   const chores = logSteps(Math.max(total, S.stepLog.date === today() ? S.stepLog.steps : 0));
   return {earned, bonus, chores};
+}
+
+/* A round walked on the honour system: three minutes on your feet, started by a tap. */
+const inRoundHours = h => h >= ROUND.from && h <= ROUND.to;
+const hourDone = h => (roundsToday().hours[h] || 0) >= ROUND.steps;
+function startWalk(){ S.walk = {t0:Date.now()}; save(); renderCamp(); }
+function checkWalk(){
+  const w = S.walk; if (!w) return null;
+  const gone = Date.now() - w.t0;
+  if (gone > ROUND.walkKeep || gone < 0){ S.walk = null; save(); return null; }   // left too long ago to count
+  if (gone < ROUND.walkMs) return null;
+  S.walk = null;
+  const h = new Date(w.t0 + ROUND.walkMs).getHours(), got = inRoundHours(h) && !hourDone(h) ? logHours({[h]:ROUND.steps}) : {earned:0, bonus:false, chores:0};
+  save(); buzz(); pushCall('/moved');
+  return got;
+}
+setInterval(() => {
+  if (!S.walk || document.hidden) return;
+  const got = checkWalk();
+  if (got){ shortcutNews = got.earned ? 'Round walked. Tobiah nodded.' + (got.bonus ? ' He trusts you a little more, and there are herbs in your hand.' : '') : 'Round walked. This hour was already counted, but your legs do not know that.'; render(); }
+  else if (S.walk){ const e = $('walkLeft'); if (e) e.textContent = fmtTime(Math.max(0, ROUND.walkMs - (Date.now() - S.walk.t0))); }
+}, 1000);
+
+/* Reminders: a small server sends "get up" calls to this phone. It is told the push address, time zone and hours, nothing else. */
+const PUSH_URL = '';   // set once the reminder server exists
+const standalone = () => !!navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const pushCapable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let pushState = {on:false, busy:false, msg:''}, pushHours = (() => { try { return JSON.parse(store.get('lwb-push-hours')) || [9, 20]; } catch { return [9, 20]; } })();
+const b64uToBytes = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+async function pushSub(){ const reg = await navigator.serviceWorker.getRegistration(); return reg ? reg.pushManager.getSubscription() : null; }
+async function pushCall(path, body){
+  if (!PUSH_URL || !pushCapable()) return null;
+  try {
+    if (!body){ const sub = await pushSub(); if (!sub) return null; body = {endpoint:sub.endpoint}; }
+    const r = await fetch(PUSH_URL + path, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)});
+    return await r.json();
+  } catch { return null; }
+}
+async function pushRefresh(){ if (!PUSH_URL || !pushCapable()) return; try { pushState.on = !!(await pushSub()) && Notification.permission === 'granted'; } catch {} renderCamp(); }
+async function pushOn(){
+  pushState.busy = true; pushState.msg = ''; renderCamp();
+  try {
+    if (await Notification.requestPermission() !== 'granted') throw new Error('Notifications are turned off for the game. Allow them in the iPhone Settings app under Notifications, then try again.');
+    const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const {key} = await (await fetch(PUSH_URL + '/key')).json();
+    const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uToBytes(key)});
+    const r = await pushCall('/subscribe', {sub:sub.toJSON(), tz:Intl.DateTimeFormat().resolvedOptions().timeZone, from:pushHours[0], to:pushHours[1]});
+    if (!r || !r.ok) throw new Error('The reminder server did not answer. Try again in a minute.');
+    pushState.on = true; pushState.msg = 'On. Tobiah will call at ten to the hour if you have not walked.';
+  } catch (e){ pushState.msg = e && e.message ? e.message : 'That did not work.'; }
+  pushState.busy = false; renderCamp();
+}
+async function pushOff(){
+  pushState.busy = true; renderCamp();
+  try { await pushCall('/unsubscribe'); const sub = await pushSub(); if (sub) await sub.unsubscribe(); } catch {}
+  pushState = {on:false, busy:false, msg:'Off. Tobiah will keep his peace.'}; renderCamp();
+}
+async function pushTest(){ pushState.msg = 'Asking Tobiah to call you now...'; renderCamp(); const r = await pushCall('/test'); pushState.msg = r && r.ok ? 'Sent. It should arrive within a few seconds.' : 'The test did not go through' + (r && r.status ? ' (the phone company answered ' + r.status + ')' : '') + '.'; renderCamp(); }
+function pushHtml(){
+  const hr = h => (h % 12 || 12) + (h < 12 || h === 24 ? ' AM' : ' PM'), opts = (sel, lo, hi) => { let o = ''; for (let h = lo; h <= hi; h++) o += `<option value="${h}"${h === sel ? ' selected' : ''}>${hr(h)}</option>`; return o; };
+  const msg = pushState.msg ? `<p class="small num">${esc(pushState.msg)}</p>` : '';
+  if (!PUSH_URL) return '<p class="small muted">Tobiah can call you on your phone when you have sat a whole hour. That part is being set up and is not switched on yet.</p>';
+  if (!pushCapable() || !standalone()) return `<p class="small muted">Your phone only lets the game call you once it is on your Home Screen.</p><ol class="small" style="margin:0;padding-left:1.25rem"><li>On the Journal tab, tap Copy my save.</li><li>In Safari, tap Share, then Add to Home Screen.</li><li>Open the game from the new icon, bring your save in on its Journal tab, and come back here.</li></ol>`;
+  if (pushState.on) return `<p class="small">Calls are on, from ${hr(pushHours[0])} to ${hr(pushHours[1])}, at ten to the hour. He stays quiet for an hour after you walk a round.</p><div class="row"><button class="quiet" id="pushTest">Call me now as a test</button><button class="quiet" id="pushOff"${pushState.busy ? ' disabled' : ''}>Turn calls off</button></div>${msg}`;
+  return `<p class="small muted">He will call at ten to the hour between these times, unless you have just walked.</p><div class="row"><label class="small">From <select id="pushFrom">${opts(pushHours[0], 5, 12)}</select></label><label class="small">until <select id="pushTo">${opts(pushHours[1], 13, 23)}</select></label></div><div class="row"><button id="pushOn"${pushState.busy ? ' disabled' : ''}>${pushState.busy ? 'Setting up...' : 'Let Tobiah call me'}</button></div>${msg}`;
+}
+
+/* Moving a save between Safari and the Home Screen copy. */
+const saveCode = () => 'LWB1:' + btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+function readSaveCode(text){
+  try { const m = /LWB1:([A-Za-z0-9+/=]+)/.exec(String(text).replace(/\s+/g, '')); if (!m) return null;
+    const j = JSON.parse(decodeURIComponent(escape(atob(m[1])))); return j && typeof j === 'object' && j.trust && j.stock && 'intro' in j ? j : null; } catch { return null; }
 }
 
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
@@ -1232,7 +1322,7 @@ function render(){
   shownKey = viewKey();
   const el = $('main'), m = S.mission;
   $('practiceBanner').hidden = !practice;
-  $('newsBanner').hidden = !shortcutNews; $('newsText').innerHTML = '<b>From your phone\'s step count.</b> ' + esc(shortcutNews);
+  $('newsBanner').hidden = !shortcutNews; $('newsText').innerHTML = '<b>Tobiah\'s rounds.</b> ' + esc(shortcutNews);
   const playing = S.intro && !!S.home;
   $('hud').hidden = $('tabs').hidden = !playing;
   showTab(playing ? tab : 'board');
@@ -1559,8 +1649,17 @@ function renderCamp(){
     $('roundPips').innerHTML = roundHours().map(h => `<span class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : h === nowH ? 'now' : ''}"><i></i>${lab(h)}</span>`).join('');
     $('roundPips').setAttribute('aria-label', n + ' rounds walked today');
     $('roundLine').textContent = !any ? 'No hours handed in today. Open the game from the shortcut below and they fill in on their own.'
-      : n + (n === 1 ? ' round' : ' rounds') + ' today.' + (n < ROUND.bonusAt ? ' ' + (ROUND.bonusAt - n) + ' more for Tobiah\'s trust and herbs.' : n >= ROUND.cap ? ' That is every round he counts in a day.' : ' Tobiah has noticed.') + ((r.hours[nowH] || 0) < ROUND.steps && nowH >= ROUND.from && nowH <= ROUND.to ? ' This hour is still open: ' + Math.max(0, ROUND.steps - (r.hours[nowH] || 0)) + ' steps to go.' : '');
-    $('roundHelp').innerHTML = ROUNDHELP; }
+      : n + (n === 1 ? ' round' : ' rounds') + ' today.' + (n < ROUND.bonusAt ? ' ' + (ROUND.bonusAt - n) + ' more for Tobiah\'s trust and herbs.' : n >= ROUND.cap ? ' That is every round he counts in a day.' : ' Tobiah has noticed.') + ((r.hours[nowH] || 0) < ROUND.steps && nowH >= ROUND.from && nowH <= ROUND.to ? ' This hour is still open.' : '');
+    $('roundHelp').innerHTML = ROUNDHELP;
+    const w = S.walk && Date.now() - S.walk.t0 < ROUND.walkMs ? S.walk : null;
+    $('walkBox').innerHTML = w ? `<p class="small">On your feet. Walk until it buzzes: <b class="num" id="walkLeft">${fmtTime(ROUND.walkMs - (Date.now() - w.t0))}</b> to go. You can leave this screen.</p><div class="row"><button class="quiet" id="walkStop">I sat back down</button></div>`
+      : !inRoundHours(nowH) ? '<p class="small muted">Tobiah is asleep. Rounds count from 6 in the morning to 10 at night.</p>'
+      : hourDone(nowH) ? '<p class="small muted">This hour\'s round is walked. The next one opens on the hour.</p>'
+      : '<div class="row"><button id="walkGo">Walk a round now (3 minutes)</button></div>';
+    const g = $('walkGo'); if (g) g.onclick = startWalk; const st = $('walkStop'); if (st) st.onclick = () => { S.walk = null; save(); renderCamp(); };
+    $('pushBox').innerHTML = pushHtml();
+    const on = $('pushOn'); if (on) on.onclick = pushOn; const off = $('pushOff'); if (off) off.onclick = pushOff; const t = $('pushTest'); if (t) t.onclick = pushTest;
+    const pf = $('pushFrom'), pt = $('pushTo'); [pf, pt].forEach(e => { if (e) e.onchange = () => { pushHours = [+pf.value, +pt.value]; store.set('lwb-push-hours', JSON.stringify(pushHours)); }; }); }
   $('journal').innerHTML = S.journal.slice(0, 6).map(j => `<li><span class="num">${j.d}</span>${esc(j.t)}</li>`).join('') || '<li class="muted">Nothing written yet.</li>';
   $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
   $('ideaPanel').hidden = !aiOn();
@@ -1587,6 +1686,13 @@ function simWalk(){
 
 /* ---------- static controls ---------- */
 $('exitPractice').onclick = () => setPractice(false);
+$('saveOut').onclick = async () => { const code = saveCode(); $('saveIn').value = code; try { await navigator.clipboard.writeText(code); $('saveLine').textContent = 'Copied. Open the other copy of the game and bring it in on this same tab.'; } catch { $('saveIn').select(); $('saveLine').textContent = 'Your save is in the box above. Select it all and copy it.'; } };
+$('saveInBtn').onclick = () => {
+  const j = readSaveCode($('saveIn').value);
+  if (!j){ $('saveLine').textContent = 'That is not a save from this game. It should start with LWB1:'; return; }
+  if (S.home && !confirm('Replace the story on this copy of the game with the one you pasted? This cannot be undone.')) return;
+  S = migrate(Object.assign(blank(), j, {v:j.v || 1})); S.mission = null; save(); location.reload();
+};
 $('newsOk').onclick = () => { shortcutNews = ''; $('newsBanner').hidden = true; };
 $('stepBtn').onclick = () => {
   const n = Math.floor(+$('stepInput').value);
@@ -1621,7 +1727,10 @@ if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
   if (got.earned || got.chores) shortcutNews = (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? 'Pip marked ' + got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
   try { history.replaceState(null, '', location.pathname); } catch {}
 }
-boot();
+if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; try { history.replaceState(null, '', location.pathname); } catch {} }
+boot(); pushRefresh();
+{ const got = checkWalk(); if (got && got.earned){ shortcutNews = 'Round walked while you were away. Tobiah nodded.'; render(); } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.walk){ const got = checkWalk(); if (got){ shortcutNews = got.earned ? 'Round walked. Tobiah nodded.' : 'Round walked.'; render(); } } });
 window.__lwb = {get S(){ return S; }, newDay, render};
 })();
 </script>

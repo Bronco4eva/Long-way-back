@@ -1,0 +1,13 @@
+{
+  "name": "long-way-back-push",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "test": "node test/push.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.0",
+    "http_ece": "^1.2.1"
+  }
+}
