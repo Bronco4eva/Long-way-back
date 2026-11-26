@@ -48,14 +48,12 @@ p{margin:0}
 .scene.strip{aspect-ratio:3/1}
 .vmap{position:relative;display:block}
 .vmap svg{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);overflow:visible}
-.spot{cursor:pointer;color:var(--muted);outline:none;-webkit-tap-highlight-color:transparent}
-.spot > *{fill:currentColor;fill-opacity:.07;stroke:currentColor;stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:all;filter:drop-shadow(0 0 2px currentColor)}
-.spot.bad{color:var(--warn)} .spot.ok{color:var(--moss)} .spot.odd{color:var(--water)} .spot.go{color:var(--ember)}
-.spot.ok > *{stroke-opacity:.5;stroke-width:2;fill-opacity:0;filter:none} .spot.odd > *{stroke-opacity:.7}
-.spot.go > *{animation:spotglow 1.4s ease-in-out infinite}
-.spot.on > *,.spot:focus-visible > *{stroke:#fff;stroke-width:3.5;fill-opacity:.22;filter:drop-shadow(0 0 5px currentColor);animation:none}
-@keyframes spotglow{50%{fill-opacity:.28;filter:drop-shadow(0 0 6px currentColor)}}
-@media (prefers-reduced-motion:reduce){.spot.go > *{animation:none}}
+.spot{cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+.spot > *{fill:#fff;fill-opacity:0;stroke:#fff;stroke-opacity:0;stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:all}
+.spot.tapped > *{animation:spotflash .7s ease-out 1}
+.spot:focus-visible > *{stroke-opacity:.9}
+@keyframes spotflash{0%{fill-opacity:.3;stroke-opacity:.9}100%{fill-opacity:0;stroke-opacity:0}}
+@media (prefers-reduced-motion:reduce){.spot.tapped > *{animation:none}}
 .key{display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin:.5rem 0 0;font-size:.8125rem;color:var(--muted)} .key i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:.45rem}
 .scene.zoom{background-repeat:no-repeat;background-size:230%}
 .face{width:72px;height:72px;flex:none;border:2px solid var(--line);border-radius:4px;object-fit:cover;background:var(--raised)}
@@ -155,8 +153,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="gut screen" data-tab="camp" hidden>
     <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
     <div><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
-      <p class="key" aria-hidden="true"><span><i style="color:var(--ember)"></i>You can fix this now</span><span><i style="color:var(--warn)"></i>Something is wrong here</span><span><i style="color:var(--moss)"></i>All is well</span></p>
-      <p class="small muted" style="margin:.4rem 0 0">Tap an outlined place in the picture to walk over and see what is wrong there.</p></div>
+      <p class="small muted" style="margin:.4rem 0 0">Tap the buildings and places in the picture to walk over to them.</p></div>
     <section class="panel" id="spotBox"></section>
     <section>
       <p class="eyebrow">The known world</p>
@@ -990,7 +987,7 @@ function logSteps(n){
 
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
 let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
-let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house';
+let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0;
 const aiOn = () => !!(sampleFn || apiKey);
 if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
 function aiErr(e){
@@ -1431,13 +1428,13 @@ function renderCamp(){
       if (mended()){ addTrust('maren', 1); note('The longhouse is whole: roof, shutters, hearth and beds. Maren walked the length of it twice and then told you where you sleep tonight. Inside.'); }
       newDay(); render();
     });
-    const c = $('campPic'), key = stage + openSpot + SPOTS.map(s => spotState(s.k)[0]).join('');
+    const c = $('campPic'), key = stage + openSpot + tapN;
     if (c && c.dataset.st !== key){ c.dataset.st = key;
       const word = {go:'you can fix something here now', bad:'something is wrong here', ok:'all is well', odd:'nobody goes in'};
       c.innerHTML = villagePic('scene') + '<svg viewBox="0 0 1024 576" preserveAspectRatio="none">' + SPOTS.filter(s => s.k !== 'house').concat(SPOTS[0]).map(s => { const st = spotState(s.k);
-        return `<g class="spot ${st}${s.k === openSpot ? ' on' : ''}" data-spot="${s.k}" tabindex="0" role="button" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}">` + SHAPES[s.k].filter(a => stage >= a[0] && stage <= a[1]).map(a => { const n = a[2].split(' ');
+        return `<g class="spot${s.k === openSpot && tapN ? ' tapped' : ''}" data-spot="${s.k}" tabindex="0" role="button" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}">` + SHAPES[s.k].filter(a => stage >= a[0] && stage <= a[1]).map(a => { const n = a[2].split(' ');
           return a[2].includes(',') ? `<polygon points="${a[2]}"/>` : `<ellipse cx="${n[0]}" cy="${n[1]}" rx="${n[2]}" ry="${n[3]}"/>`; }).join('') + '</g>'; }).join('') + '</svg>';
-      c.querySelectorAll('.spot').forEach(g => { const go = () => { openSpot = g.dataset.spot; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); };
+      c.querySelectorAll('.spot').forEach(g => { const go = () => { openSpot = g.dataset.spot; tapN++; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); };
         g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } }; });
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
