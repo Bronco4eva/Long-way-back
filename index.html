@@ -1990,12 +1990,14 @@ function renderStart(el){
     ${dots}<button class="quiet" id="climbSkip">I can't walk right now</button>`;
   else h = scene('intro-edge', 'Hollow Ash', 'You, in the stolen cloak by the campfire with a bowl, the others watching from across the flames, a ruined arch behind them',
     `${G.skip ? pipSays : ''}<p>${G.skip ? '' : 'By the top of the path your glim is the brightest thing on the mountain. '}At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"${cap(P[0])} fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>`)
-    + (S.home ? '<p class="small muted">Your camp stands where you started that walk. If that is not where you sleep, you can move it later: open You, then Your phone.</p>' : '') + dots + '<button class="primary" id="begin">Take the offer</button>';
+    + (S.home ? '<div class="panel"><h3>Are you at home right now?</h3><p class="small">Hollow Ash stands at your own door, because every walk starts there and ends there. If you are at work or out somewhere, the camp can stand here for now and move home with you later.</p></div>' : '') + dots
+    + (S.home ? '<button class="primary" id="begin">Take the offer. I am at home</button><button id="beginAway">Take the offer. I am somewhere else</button>' : '<button class="primary" id="begin">Take the offer</button>');
   el.innerHTML = h;
   const go = n => { G.step = n; save(); render(); window.scrollTo(0, 0); };
   const pre = {0:'intro-fall', 1:'intro-landing', 2:'intro-cloak', 3:'intro-climb', 6:'intro-edge'}[step]; if (pre) new Image().src = 'art/' + pre + '.jpg';
   if ($('begin')) $('begin').onclick = () => { if (step === 7) startDone(); else go(step + 1); };
   if ($('introBack')) $('introBack').onclick = () => go(step - 1);
+  if ($('beginAway')) $('beginAway').onclick = () => { G.away = 1; startDone(); };
   el.querySelectorAll('button[data-look]').forEach(b => b.onclick = () => { S.look = b.dataset.look; delete S.pron; save(); render(); });
   if ($('glimTap')) $('glimTap').onclick = () => { glimTone('step'); G.glim = 1; save(); render(); };
   if ($('climbGo')) $('climbGo').onclick = climbStart;
@@ -2120,8 +2122,10 @@ function render(){
       ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
       ${!practice && !wantHome && !geoError ? '<p class="small muted">Your phone will ask to share your location. Tap <b>Allow</b>.</p>' : ''}
       ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
+      ${S.start && !wantHome ? '<p class="small">Not at home right now? Set the camp where you are for now. You can move it from the Camp screen once you are at your own door.</p>' : ''}
       <div class="row">
         <button class="primary grow" id="setHome">${practice ? 'Set practice camp' : geoBlocked ? 'Try again' : 'Set camp here'}</button>
+        ${S.start && !wantHome ? '<button class="grow" id="setAway">I am not at home. Camp here for now</button>' : ''}
         ${practice ? '' : '<button class="grow" id="goPractice">Try practice mode</button>'}
       </div>
       ${practice ? '' : geoBlocked ? locHelp(true) : '<details class="lochelp top"><summary>Trouble with location?</summary>' + locHelp(true) + '</details>'}`;
@@ -2130,6 +2134,7 @@ function render(){
       else { wantHome = Date.now(); geoError = ''; geoBlocked = false; startGPS(); render(); if (pos) onFix(pos); }
     };
     if ($('goPractice')) $('goPractice').onclick = () => setPractice(true);
+    if ($('setAway')) $('setAway').onclick = () => { S.start.away = 1; save(); $('setHome').click(); };
   } else if (m && m.phase === 'battle'){
     const T = TASKS[m.id], mv = MOVES[m.move], dare = T.battle === 'dare';
     el.innerHTML = `${dare ? pic('p-pip', 'scene strip', 'Pip, grinning') : pic('s-crossing', 'scene strip', 'Two hooded Tallymen scouts')}<p class="eyebrow">${dare ? 'The dare' : 'The ' + SITE[T.res] + ' is held'}</p>
@@ -2500,7 +2505,9 @@ function renderCamp(){
     { const G = S.start, gb = $('growBox'), nk = G && G.news[0], N = nk === 'rounds' ? ROUNDS_NEWS : GROW.find(g => g.k === nk);
       const where = {tobiah:'Tobiah sits at the fire now, and what he needs is on the Walk screen. The fire is yours to feed from tonight.', steps:'Today\'s steps are on the You screen now, under your glim. Pip\'s dare is on the Walk screen.', dack:'Dack is at the fire now. His work is on the Walk screen, and some of it is a fight.', isla:'Isla is at the fire now. The camp\'s water is yours to carry too.', oona:'Oona is at the fire now. Reeds are on the Walk screen, and her loom is at the longhouse.', build:'Tap a place in the picture to see what is broken there and what it would take to mend.', rounds:'Tap Tobiah at the fire to see his rounds.'};
       gb.innerHTML = N ? `<div class="panel"><div class="newsrow">${pic('p-' + N.who, 'face sm')}<div><p class="eyebrow">New at the fire</p><h3>${esc(N.h)}</h3></div></div><p class="say">${esc(N.t)}</p><p class="small muted">${where[nk]}</p><button class="primary" id="growOk">Good</button></div>` : '';
-      if ($('growOk')) $('growOk').onclick = () => { G.news.shift(); save(); renderCamp(); }; }
+      if ($('growOk')) $('growOk').onclick = () => { G.news.shift(); save(); renderCamp(); };
+      if (G && G.away && S.home && !N){ gb.innerHTML = `<div class="panel"><p class="eyebrow">Camp for now</p><p class="small">You were away from home when you arrived, so Hollow Ash stands where you took that first walk. You can play from here. When you are standing at your own door, move the camp there. The places you have found near here will be left behind.</p><button id="homeNow">I am home now. Move the camp here</button></div>`;
+        $('homeNow').onclick = () => { G.away = 0; S.home = null; S.offer = null; S.places = {}; sheet = ''; save(); render(); window.scrollTo(0, 0); }; } }
     $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
       if (!met(k)) return `<span class="shade" role="img" aria-label="Someone you have not met yet">${pic('p-' + k, 'face')}<span>&nbsp;</span><em>a shape</em></span>`;
       return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? (lost()[k] ? 'led away by the Unlit' : 'taken by the Tallymen') : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? (lost()[k] ? 'gone' : 'taken') : m.word}</em></button>`; }).join('');
