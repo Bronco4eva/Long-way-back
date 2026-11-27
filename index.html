@@ -1878,15 +1878,21 @@ function drawRadar(){
   } else { g.setLineDash([6, 6]); g.strokeStyle = col('--muted'); g.lineWidth = 1.5; g.beginPath(); g.moveTo(H.x, H.y); g.lineTo(T.x, T.y); g.stroke(); g.setLineDash([]); }
   g.fillStyle = col('--moss'); trail.forEach(t => { const q = P(t); g.fillRect(q.x - 2.5, q.y - 2.5, 5, 5); });
   g.font = '600 12px Barlow, system-ui, sans-serif'; g.textAlign = 'center';
+  const home = !!S.mission && S.mission.phase === 'back';
   const Hp = pin(H), Tp = pin(T), far = (q, to) => q.off && pos ? ' ' + fmtDist(dist(pos, to)) : '';
   g.globalAlpha = Hp.off ? .75 : 1;
-  g.fillStyle = col('--ink'); g.fillRect(Hp.x - 7, Hp.y - 7, 14, 14); g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -12 : 22));
+  // Camp is the old arch: two pillars and a round top. It glows ember on the way home, when it is where you are headed.
+  g.strokeStyle = g.fillStyle = col(home ? '--ember' : '--ink'); g.lineWidth = 4; g.lineCap = 'butt';
+  g.beginPath(); g.moveTo(Hp.x - 8, Hp.y + 9); g.lineTo(Hp.x - 8, Hp.y - 2); g.arc(Hp.x, Hp.y - 2, 8, Math.PI, 0); g.lineTo(Hp.x + 8, Hp.y + 9); g.stroke();
+  g.fillRect(Hp.x - 12, Hp.y + 8, 8, 3); g.fillRect(Hp.x + 4, Hp.y + 8, 8, 3);
+  g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -17 : 26));
   g.globalAlpha = Tp.off ? .75 : 1;
   g.fillStyle = placeColor(placeKey(TASKS[m.id])); g.beginPath(); g.moveTo(Tp.x, Tp.y - 9); g.lineTo(Tp.x + 9, Tp.y); g.lineTo(Tp.x, Tp.y + 9); g.lineTo(Tp.x - 9, Tp.y); g.fill();
+
+  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase() + far(Tp, m.site), Tp.x, Tp.y + (Tp.y > h - 40 ? -32 : 24));
   // A little flag planted on the destination, so the end of the walk is easy to pick out.
   g.strokeStyle = col('--ink'); g.lineWidth = 2; g.beginPath(); g.moveTo(Tp.x, Tp.y); g.lineTo(Tp.x, Tp.y - 26); g.stroke();
   g.beginPath(); g.moveTo(Tp.x + 1, Tp.y - 26); g.lineTo(Tp.x + 15, Tp.y - 21); g.lineTo(Tp.x + 1, Tp.y - 15); g.fill();
-  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase() + far(Tp, m.site), Tp.x, Tp.y + (Tp.y > h - 40 ? -32 : 24));
   g.globalAlpha = 1;
   if (pos){
     const U = P(pts[2]);
