@@ -1881,11 +1881,12 @@ function drawRadar(){
   const home = !!S.mission && S.mission.phase === 'back';
   const Hp = pin(H), Tp = pin(T), far = (q, to) => q.off && pos ? ' ' + fmtDist(dist(pos, to)) : '';
   g.globalAlpha = Hp.off ? .75 : 1;
-  // Camp is the old arch: two pillars and a round top. It glows ember on the way home, when it is where you are headed.
-  g.strokeStyle = g.fillStyle = col(home ? '--ember' : '--ink'); g.lineWidth = 4; g.lineCap = 'butt';
-  g.beginPath(); g.moveTo(Hp.x - 8, Hp.y + 9); g.lineTo(Hp.x - 8, Hp.y - 2); g.arc(Hp.x, Hp.y - 2, 8, Math.PI, 0); g.lineTo(Hp.x + 8, Hp.y + 9); g.stroke();
-  g.fillRect(Hp.x - 12, Hp.y + 8, 8, 3); g.fillRect(Hp.x + 4, Hp.y + 8, 8, 3);
-  g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -17 : 26));
+  // Camp is the old arch: a stone gateway with a doorway through it. It glows ember on the way home, when it is where you are headed.
+  g.fillStyle = col(home ? '--ember' : '--ink');
+  { const x = Hp.x, y = Hp.y; g.beginPath(); g.rect(x - 11, y - 9, 22, 19);                       // the stone block
+    g.moveTo(x - 5, y + 10); g.lineTo(x - 5, y); g.arc(x, y, 5, Math.PI, 0); g.lineTo(x + 5, y + 10); g.closePath(); // the doorway through it
+    g.fill('evenodd'); g.fillRect(x - 13, y - 13, 26, 4); g.fillRect(x - 2, y - 9, 4, 4); }           // cap stone and keystone
+  g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -19 : 26));
   g.globalAlpha = Tp.off ? .75 : 1;
   g.fillStyle = placeColor(placeKey(TASKS[m.id])); g.beginPath(); g.moveTo(Tp.x, Tp.y - 9); g.lineTo(Tp.x + 9, Tp.y); g.lineTo(Tp.x, Tp.y + 9); g.lineTo(Tp.x - 9, Tp.y); g.fill();
 
