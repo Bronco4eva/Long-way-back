@@ -171,8 +171,8 @@ a{color:var(--water)}
 .rmap .pin.home{background:#fff;color:#14110F}.rmap .pin.dest{background:var(--ember);color:var(--on-ember)}
 .rmap-credit{position:absolute;right:0;bottom:0;padding:1px 6px;font-size:.6875rem;background:rgba(255,255,255,.85);color:#1F2937}
 .cmprow{display:flex;align-items:center;gap:12px}.cmp{position:relative;flex:none;width:92px;height:92px;border:2px solid var(--line);border-radius:50%;background:var(--raised)}
-.cmp svg{position:absolute;left:12px;top:12px;width:64px;height:64px;display:block;transform-origin:32px 32px;transition:transform .15s linear;opacity:.25}.cmp path{fill:var(--muted)}.cmp.live svg{opacity:1}.cmp.live path{fill:var(--water)}.cmp.on{border-color:var(--moss)}.cmp.on path{fill:var(--moss)}
-.cmp-n{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;font:600 .6875rem/14px Barlow,system-ui,sans-serif;text-align:center;color:var(--muted);font-style:normal;transform:translateY(-34px);opacity:0}.cmp.live .cmp-n{opacity:1}
+.cmp svg{position:absolute;left:12px;top:12px;width:64px;height:64px;display:block;transform-origin:32px 32px;transition:transform .25s linear;opacity:.25}.cmp path{fill:var(--muted)}.cmp.live svg{opacity:1}.cmp.live path{fill:var(--water)}.cmp.on{border-color:var(--moss)}.cmp.on path{fill:var(--moss)}
+.cmp-n{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;font:600 .6875rem/14px Barlow,system-ui,sans-serif;text-align:center;color:var(--muted);font-style:normal;transform:translateY(-34px);opacity:0;transition:transform .25s linear}.cmp.live .cmp-n{opacity:1}
 #cmpLine{margin:.35rem 0;color:var(--muted);min-height:1.3em}#cmpBtn{margin-bottom:.5rem}
 .rmap.g{aspect-ratio:1/1;background:var(--raised)}.rmap.g iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
@@ -1568,7 +1568,12 @@ function onOrient(e){
   else if (e.absolute && e.alpha != null) h = 360 - e.alpha;
   if (h == null) return;
   h += (screen.orientation && screen.orientation.angle) || 0;
-  heading = ((h % 360) + 360) % 360; updateCompass(); queueRadar();
+  h = ((h % 360) + 360) % 360;
+  // Phone compasses jitter by a few degrees even when held still. Ease toward each reading, and ignore changes too
+  // small to be a real turn, so the N and the map sit still until you actually turn.
+  if (heading == null) heading = h;
+  else { const d = ((h - heading + 540) % 360) - 180; if (Math.abs(d) < 2.5) return; heading = (heading + d * (Math.abs(d) > 25 ? .6 : .25) + 360) % 360; }
+  updateCompass(); queueRadar();
 }
 const needsCompassTap = () => typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
 async function startCompass(){
