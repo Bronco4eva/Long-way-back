@@ -1547,31 +1547,38 @@ async function stepsDisconnect(){
   try { localStorage.removeItem('lwb-steps-code'); localStorage.removeItem('lwb-steps-at'); } catch {}
   renderCamp();
 }
-async function stepsPull(){
-  if (!PUSH_URL || !stepCode || !S.home) return;
+async function stepsPull(byHand){
+  byHand = byHand === true;   // the Check now button says what it found; the quiet checks on opening do not
+  const say = t => { if (byHand){ stepLink.busy = false; stepLink.msg = t; render(); } };
+  if (!PUSH_URL || !stepCode) return;
+  if (!S.home) return say('Set your camp first, then check again.');
+  if (byHand){ stepLink.busy = true; stepLink.msg = ''; render(); }
   try {
     const {status, body} = await stepsCall('/steps-read');
-    if (status === 404){ await stepsCall('/steps-on'); return; }   // the server forgot a code left unused for a month; give it back
-    if (!body.ok || !body.at) return;
+    if (status === 404){ await stepsCall('/steps-on'); return say('The server had forgotten this phone, so it is connected again. Run the shortcut once more, then check.'); }   // the server forgot a code left unused for a month; give it back
+    if (!body.ok) return say('That did not go through. Try again in a moment.');
+    if (!body.at) return say('Nothing has arrived from your phone yet. Run the shortcut once, then check again.');
     const news = body.at !== stepLink.at; stepLink.at = body.at; store.set('lwb-steps-at', String(body.at));
-    if (new Date(body.at).toLocaleDateString('en-CA') !== today()){ if (news) renderCamp(); return; }   // yesterday's count is not today's
+    if (new Date(body.at).toLocaleDateString('en-CA') !== today()){ if (news && !byHand) renderCamp(); return say('The last count is not from today. Run the shortcut to send today\'s steps.'); }   // yesterday's count is not today's
     const got = logHours(body.hours || {});
     if (got.earned || got.chores) shortcutNews = 'Your phone told Pip: ' + (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
+    const hs = Object.values(body.hours || {}), sum = hs.reduce((x, y) => x + y, 0), rounds = hs.filter(n => n >= ROUND.steps).length;
+    if (byHand){ stepLink.busy = false; stepLink.msg = 'Checked. Your phone has sent ' + sum.toLocaleString() + ' steps for today' + (rounds ? ', with ' + rounds + (rounds === 1 ? ' hour' : ' hours') + ' of ' + ROUND.steps + ' or more.' : '.'); }
     render();
-  } catch {}
+  } catch { say('Could not reach the server. Check your signal and try again.'); }
 }
-const stepHelp = () => `<p class="small muted">One shortcut in the iPhone Shortcuts app does this. It has not been tried on a real phone yet, so say where it goes wrong.</p>
+const stepHelp = () => `<p class="small muted">One shortcut in the iPhone Shortcuts app does this.</p>
   <label for="stepUrlBox">Your phone's own link</label>
   <div class="row"><input class="grow" style="flex-basis:8rem;min-width:0;min-height:44px;padding:.5rem .6rem;font:400 .875rem Barlow,system-ui,sans-serif;color:var(--muted);background:var(--bg);border:2px solid var(--line);border-radius:4px" id="stepUrlBox" readonly value="${stepUrl()}"><button id="stepCopy">Copy</button></div>
   <p class="small muted">Keep this link to yourself. Anyone who has it could send a step count in your name, and nothing more.</p>
   <ol>
   <li>Tap Copy above. Then open Shortcuts, tap +, and name the new shortcut Glim count.</li>
   <li>Add the action Find Health Samples. Set Type to Steps. Add the filter Start Date is today. Set Group By to Hour and Sort By to Start Date.</li>
-  <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen.</li>
+  <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen. The second bubble still reads Repeat Item, and that is right.</li>
   <li>Below End Repeat add Combine Text, with Custom separator <b>_</b> (an underscore).</li>
-  <li>Add a URL action. Paste the link, and put the Combined Text right after the equals sign at its end.</li>
-  <li>Add Get Contents of URL.</li>
-  <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here: your glim should have your steps.</li>
+  <li>Below Combine Text add Get Contents of URL. Paste the link into it, tap at its very end, and choose Combined Text from the strip above the keyboard, so the bubble sits right after the equals sign. It must be below Combine Text or the bubble is not offered.</li>
+  <li>When it runs you should see "ok" and your steps for today. A 0 means the bubble is missing.</li>
+  <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here and tap Check now.</li>
   <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Glim count. Add one for each hour you want counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>
   <details class="lochelp"><summary>A shorter shortcut, if that one is a struggle</summary><ol>
   <li>Four actions and no Repeat. Add Find Health Samples with Type Steps and the filter Start Date is today. Leave the rest alone.</li>
@@ -1588,10 +1595,11 @@ function renderStepLink(){
     <button id="stepsOn"${stepLink.busy ? ' disabled' : ''}>${stepLink.busy ? 'Connecting…' : 'Connect my steps'}</button>${stepLink.msg ? `<p class="small" style="color:var(--warn)">${stepLink.msg}</p>` : ''}`;
   else box.innerHTML = `<h3>Your phone counts for your glim</h3>
     <p class="small num">${stepLink.at ? 'Your glim last heard from your phone ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'Your glim has not heard from your phone yet. Follow the steps below, then run the shortcut once.'}</p>
+    ${stepLink.msg ? `<p class="small" role="status"><b>${stepLink.msg}</b></p>` : ''}
     <details class="lochelp"${(open == null ? !stepLink.at : open) ? ' open' : ''}><summary>How to set up the shortcut</summary>${stepHelp()}</details>
-    <div class="row"><button class="quiet" id="stepsCheck">Check now</button><button class="quiet" id="stepsOff">Disconnect</button></div>`;
+    <div class="row"><button class="quiet" id="stepsCheck"${stepLink.busy ? ' disabled' : ''}>${stepLink.busy ? 'Checking…' : 'Check now'}</button><button class="quiet" id="stepsOff">Disconnect</button></div>`;
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
-  on('stepsOn', stepsConnect); on('stepsOff', stepsDisconnect); on('stepsCheck', stepsPull);
+  on('stepsOn', stepsConnect); on('stepsOff', stepsDisconnect); on('stepsCheck', () => stepsPull(true));
   on('stepCopy', async () => { try { await navigator.clipboard.writeText(stepUrl()); $('stepCopy').textContent = 'Copied'; } catch { $('stepUrlBox').select(); } });
 }
 let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
