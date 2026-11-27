@@ -7,7 +7,7 @@ const CONTACT = 'https://bronco4eva.github.io/Long-way-back/';
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
 const MAX_PHONES = 200;
 
-// Steps from a phone's Health app. An iPhone shortcut calls /steps/<code> with today's count for each hour; the game,
+// Steps from a phone's Health app. An iPhone shortcut calls /steps/<code> with today's count, as one total or hour by hour; the game,
 // which made the code, reads it back. We keep the hourly counts for the day and when they came. Nothing else from Health.
 const STEPS = {round:250, fresh:70 * 60000, keep:30 * 86400, sameFor:6 * 3600000};
 const codeOk = c => typeof c === 'string' && /^[A-Za-z0-9]{20,40}$/.test(c);
@@ -23,14 +23,27 @@ export function parseHours(text){
   });
   return out;
 }
-export async function takeSteps(env, code, text, now = Date.now()){
+const cleanCount = t => +String(t).trim().replace(/[.,]\d{1,2}$/, '').replace(/\D/g, '');
+const localDay = (tz, now) => { try { return new Intl.DateTimeFormat('en-CA', {timeZone:tz, year:'numeric', month:'2-digit', day:'2-digit'}).format(now); } catch { return ''; } };
+// The phone may send the hours itself (text), or only today's total so far. With a total we put what was added since
+// the last call into the hour it is now where the player lives, so one short shortcut is enough.
+export async function takeSteps(env, code, text, now = Date.now(), total = null, tzGuess = ''){
   if (!codeOk(code)) return [{error:'bad code'}, 400];
   const name = await stepsKey(code), rec = await env.SUBS.get(name, 'json');
   if (!rec) return [{error:'This code is not known. Open the game and connect your steps again.'}, 404];   // only the game can make a code
-  const hours = parseHours(text), total = Object.values(hours).reduce((a, b) => a + b, 0);
+  let next;
+  if (total != null && String(total).trim() !== ''){
+    const n = cleanCount(total); if (!(n >= 0) || n > 200000) return [{error:'That does not look like a step count.'}, 400];
+    const tz = [rec.tz, tzGuess, 'UTC'].find(z => z && localHour(z, new Date(now)) >= 0), when = new Date(now);
+    const day = localDay(tz, when), h = localHour(tz, when), same = rec.at && localDay(tz, new Date(rec.at)) === day;
+    const hours = same ? {...rec.hours} : {}, had = Object.values(hours).reduce((a, b) => a + b, 0);
+    if (n > had) hours[h] = Math.min(60000, (hours[h] || 0) + n - had);
+    next = {hours, total:n};
+  } else next = {hours:parseHours(text)};
+  const sum = next.total != null ? next.total : Object.values(next.hours).reduce((a, b) => a + b, 0);
   // Storage writes are counted on the free plan, so an hour with nothing new is not written again.
-  if (JSON.stringify(hours) !== JSON.stringify(rec.hours) || now - rec.at > STEPS.sameFor) await env.SUBS.put(name, JSON.stringify({hours, at:now}), {expirationTtl:STEPS.keep});
-  return [{ok:true, steps:total}, 200];
+  if (JSON.stringify(next.hours) !== JSON.stringify(rec.hours) || now - rec.at > STEPS.sameFor) await env.SUBS.put(name, JSON.stringify({hours:next.hours, at:now, ...(rec.tz ? {tz:rec.tz} : {})}), {expirationTtl:STEPS.keep});
+  return [{ok:true, steps:sum}, 200];
 }
 
 // Villager voices for players who have no key of their own. The key is a secret on this server (ANTHROPIC_API_KEY)
@@ -222,7 +235,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/key') return reply({key:(await vapid(env)).pub}, 200, origin);
     // The one call that does not come from the game: the phone's shortcut, which has no page behind it.
     if (url.pathname.startsWith('/steps/')){
-      const [body, status] = await takeSteps(env, url.pathname.slice(7), url.searchParams.get('hours'));
+      const [body, status] = await takeSteps(env, url.pathname.slice(7), url.searchParams.get('hours'), Date.now(), url.searchParams.get('total'), request.cf && request.cf.timezone);
       return reply(body, status, origin);
     }
     if (request.method !== 'POST') return reply({error:'not found'}, 404, origin);
@@ -245,6 +258,9 @@ export default {
       const sName = await stepsKey(j.code), st = await env.SUBS.get(sName, 'json');
       // If this phone also takes Tobiah's calls, tie the two together so he does not call in an hour already walked.
       const pName = typeof j.endpoint === 'string' ? await keyFor(j.endpoint) : null, phone = pName ? await env.SUBS.get(pName, 'json') : null;
+      // The game says which time zone the player is in, so a plain total can be put in the right hour.
+      const tz = typeof j.tz === 'string' && j.tz.length < 64 && localHour(j.tz) >= 0 ? j.tz : '';
+      if (st && tz && st.tz !== tz && url.pathname !== '/steps-off'){ st.tz = tz; await env.SUBS.put(sName, JSON.stringify(st), {expirationTtl:STEPS.keep}); }
       if (url.pathname === '/steps-read'){
         if (st && phone && phone.steps !== sName){ phone.steps = sName; await env.SUBS.put(pName, JSON.stringify(phone)); }
         return st ? reply({ok:true, hours:st.hours, at:st.at}, 200, origin) : reply({error:'not connected'}, 404, origin);
@@ -256,7 +272,7 @@ export default {
       }
       if (!st){
         if ((await env.SUBS.list({prefix:'steps:', limit:MAX_PHONES})).keys.length >= MAX_PHONES) return reply({error:'full'}, 429, origin);
-        await env.SUBS.put(sName, JSON.stringify({hours:{}, at:0}), {expirationTtl:STEPS.keep});
+        await env.SUBS.put(sName, JSON.stringify({hours:{}, at:0, ...(tz ? {tz} : {})}), {expirationTtl:STEPS.keep});
       }
       if (phone && phone.steps !== sName){ phone.steps = sName; await env.SUBS.put(pName, JSON.stringify(phone)); }
       return reply({ok:true}, 200, origin);
