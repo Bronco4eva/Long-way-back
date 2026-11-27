@@ -184,6 +184,47 @@ a{color:var(--water)}
 html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
 .maprow{display:flex;align-items:center;gap:10px;margin:.4rem 0}.maprow p{margin:0}.mapicon{flex:none;width:44px;height:44px;min-height:0;padding:0;display:grid;place-items:center;background:var(--raised);border:2px solid var(--line);border-radius:4px}.mapicon svg{width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round}.mapicon[aria-pressed=true]{border-color:var(--ember)}.mapicon[aria-pressed=true] svg{stroke:var(--ember)}
 #world{height:260px}
+/* Less text, more charts: rings, hour bars, gauges */
+.camphead .say{font-size:1.0625rem}
+.firebox{display:flex;gap:.7rem;align-items:center;background:var(--surface);border:2px solid var(--line);padding:.6rem .75rem}
+.firebox svg{flex:none;width:34px;height:34px}.firebox>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem}
+.firebox b{font:400 1.375rem/1 var(--display)}.firebox b small{font:500 .75rem var(--body);color:var(--muted);margin-left:.4rem}
+.seg{display:flex;gap:3px}.seg i{flex:1;height:10px;background:var(--raised);border:1px solid var(--line)}.seg i.on{background:var(--c,var(--ember));border-color:var(--c,var(--ember))}
+.firebox.low{border-color:var(--ember)}.firebox.out b{color:var(--ember)}
+.unlit{display:flex;gap:3px;align-items:center;font-size:.75rem;color:var(--muted)}.unlit i{width:10px;height:10px;border:1px solid var(--muted);transform:rotate(45deg);margin:0 3px}.unlit i.on{background:var(--warn);border-color:var(--warn)}
+.fire .tr{display:flex;gap:1px;width:100%;margin-top:1px}.fire .tr u{flex:1;height:4px;background:var(--line)}.fire .tr u.on{background:var(--moss)}
+.gauges{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem;align-items:end}
+.gauges>div{display:flex;flex-direction:column;align-items:center;gap:3px}
+.gauges .col{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;height:74px;padding:2px;border:2px solid var(--line);background:var(--surface)}
+.gauges .col i{flex:0 0 calc((100% - 22px)/12);background:var(--c)}
+.gauges .low .col{border-color:var(--ember)}
+.gauges b{font:400 1.375rem/1 var(--display);font-variant-numeric:tabular-nums}.gauges .low b{color:var(--ember)}
+.gauges small{font:500 .6875rem var(--body);color:var(--muted);white-space:nowrap}
+.gauges em{font:400 .6875rem var(--body);font-style:normal;color:var(--muted);min-height:1em}.gauges .low em{color:var(--ember)}
+.chipsrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:.4rem}.chipsrow button{min-height:44px;padding:.3rem .8rem;border:2px solid var(--line);border-left:4px solid var(--warn);background:var(--surface);font:400 1.25rem var(--display)}
+.rings{display:flex;gap:1rem;align-items:center}
+.ringpic{position:relative;flex:none;width:150px;height:150px}.ringpic svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ringpic circle{fill:none;stroke-width:11}.ringpic .glim{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px}
+.ringkey{list-style:none;margin:0;padding:0;flex:1;min-width:0;display:flex;flex-direction:column;gap:.55rem}
+.ringkey li{display:grid;grid-template-columns:12px 1fr;column-gap:.5rem;align-items:baseline}
+.ringkey i{width:12px;height:12px;background:var(--c);align-self:center}
+.ringkey b{font:400 1.75rem/1 var(--display);font-variant-numeric:tabular-nums}.ringkey b small{font:500 .8125rem var(--body);color:var(--muted)}
+.ringkey span{grid-column:2;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.hours{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;align-items:end;height:84px;margin-top:1rem;position:relative;border-bottom:2px solid var(--line)}
+.hours button{min-height:0;height:100%;padding:0;border:0;border-radius:0;background:none;display:flex;align-items:flex-end}
+.hours button i{display:block;width:100%;background:var(--gold);min-height:0}.hours button.dim i{background:#7d6634}.hours button[aria-pressed=true] i{outline:2px solid var(--ink)}
+.hours button.now{background:rgba(255,255,255,.05)}
+.hrow{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-top:4px}
+.hrow u{height:8px;border:1px solid var(--line);text-decoration:none}.hrow u.on{background:var(--water);border-color:var(--water)}
+.hrow span{font-size:.6875rem;color:var(--muted);white-space:nowrap}
+.hcap{font-size:.8125rem;color:var(--muted);margin-top:.35rem;font-variant-numeric:tabular-nums}
+.meter{margin-top:1rem}.meter .seg i{height:12px}.meter .lab{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-top:4px}.meter .lab b{color:var(--ink);font-weight:600}
+.glimask{display:flex;flex-direction:column;gap:.5rem;border-top:1px solid var(--line);padding-top:.9rem}
+.lochelp.more{padding:.5rem 0 0}.lochelp.more>summary{color:var(--muted);font-weight:500;font-size:.875rem}
+.tones{list-style:none;margin:.5rem 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px}.tones li{display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:var(--muted);margin:0}.tones button{min-height:40px;padding:.2rem .7rem}
+.xpring{position:relative;flex:none;width:5.5rem;height:5.5rem}
+.attrs.four{grid-template-columns:repeat(4,1fr);gap:.5rem;text-align:center}.attrs.four b{display:block;margin:.1rem 0 .25rem}.attrs.four em{display:block;font:400 .6875rem var(--body);font-style:normal;color:var(--muted);margin-top:.25rem;white-space:nowrap}
+:root{--gold:#E2B04C}
 .fixbox{margin:.5rem 0}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:.5rem 0 .75rem}.chips button{min-height:40px;padding:.3rem .7rem;font-size:.9375rem}.fixbox input{width:100%;box-sizing:border-box;margin:.25rem 0 .6rem;min-height:44px;padding:.55rem .7rem;font:400 1rem Barlow,system-ui,sans-serif;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:4px}.fixbox input::placeholder{color:var(--muted);opacity:.7}
 </style>
 
@@ -197,17 +238,17 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="screen" data-tab="camp" hidden>
     <div class="vscroll" id="vscroll"><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span></div>
     <div class="gut col">
-      <p class="say" id="campLine"></p>
+      <div class="camphead"><p class="say" id="campLine"></p></div>
+      <div id="fireBox"></div>
       <p class="small alarm" id="campWarn" hidden></p>
     <div class="banner" id="newsBanner" hidden style="border-color:var(--moss)"><span id="newsText"></span><button class="quiet" id="newsOk">Good</button></div>
     <section class="panel" id="tallyBox" hidden></section>
       <div id="taleBox"></div>
       <div id="askBox"></div>
-      <div><p class="eyebrow" style="margin-bottom:.4rem">At the fire</p><div class="fire" id="fire"></div></div>
-      <div class="hud-stores" id="hudStores"></div>
+      <div class="fire" id="fire"></div>
+      <div class="gauges" id="hudStores"></div>
       <div id="missing"></div>
-      <div><button class="quiet" data-open="plans">Everything the camp means to build</button></div>
-      <p class="small muted">Slide the picture. Tap a building or a place to walk over to it.</p>
+      <div><button class="quiet" data-open="plans">Build plans</button></div>
     </div>
   </div>
 
@@ -222,30 +263,39 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
 
   <!-- YOU -->
   <div class="gut screen" data-tab="you" hidden>
-    <section class="panel" id="sheet" style="margin-top:1rem"></section>
-    <section class="panel" id="glimPanel">
-      <div class="thead"><i class="glim big" id="glimOrb"></i><div><h2>Your glim</h2><p class="small" id="glimLine"></p></div></div>
-      <p class="small muted">Everyone here has a glim, a small light that has kept beside them since they were children. Yours came out of a Tallyman's cage and stayed. A glim lives on its person's walking: every step you take keeps it bright, even the ones outside a task. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
-      <label for="stepInput">Today's steps</label>
-      <div class="row">
-        <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400">
-        <button id="stepBtn">Log steps</button>
-      </div>
-      <p class="small num" id="stepLine"></p>
-      <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
-      <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem">
-        <h3>Ask your glim</h3>
-        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a soft pulse of light, the same one it makes when you take a step. Two pulses with the second sliding higher is yes. Two with the second sliding lower is no. Four pulses are the soft answers: the last one higher is maybe, the last one lower means it is not sure. Turn your ring switch on to hear it.</p>
+    <section class="panel" id="glimPanel" style="margin-top:1rem">
+      <div id="todayBox"></div>
+      <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem"></div>
+      <div class="glimask">
         <div class="row">
-          <input class="grow" style="flex-basis:8rem" type="text" id="glimAsk" maxlength="200" placeholder="Is Pip all right?">
+          <input class="grow" style="flex-basis:8rem" type="text" id="glimAsk" maxlength="200" placeholder="Ask your glim: yes or no?" aria-label="Ask your glim a yes or no question">
           <button id="glimAskBtn">Ask</button>
         </div>
         <p class="small" id="glimAns" aria-live="polite"></p>
-        <div class="row"><button class="quiet" data-tone="step">Hear a step</button><button class="quiet" data-tone="yes">Hear yes</button><button class="quiet" data-tone="no">Hear no</button><button class="quiet" data-tone="maybe">Hear maybe</button><button class="quiet" data-tone="unsure">Hear unsure</button></div>
-        <p class="small">Hearing nothing? An iPhone keeps a web page silent while its ring switch is set to silent. Turn the ringer on to hear your glim.</p>
+        <details class="lochelp more"><summary>How it answers</summary>
+          <ul class="tones">
+            <li><button class="quiet" data-tone="step">Step</button><span>one pulse</span></li>
+            <li><button class="quiet" data-tone="yes">Yes</button><span>two, rising</span></li>
+            <li><button class="quiet" data-tone="no">No</button><span>two, falling</span></li>
+            <li><button class="quiet" data-tone="maybe">Maybe</button><span>four, rising</span></li>
+            <li><button class="quiet" data-tone="unsure">Unsure</button><span>four, falling</span></li>
+          </ul>
+          <p class="small muted">No sound? Turn your iPhone's ring switch on.</p>
+        </details>
       </div>
-      <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
+      <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      <details class="lochelp more" id="stepManual"><summary>Type steps in</summary>
+        <div class="row" style="margin-top:.5rem">
+          <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400" aria-label="Today's steps">
+          <button id="stepBtn">Log</button>
+        </div>
+        <p class="small num" id="stepLine" style="margin-top:.4rem"></p>
+      </details>
+      <details class="lochelp more"><summary>About your glim</summary>
+        <p class="small muted" style="margin-top:.4rem">Everyone here has a glim. Yours came out of a Tallyman's cage and stayed. Walking keeps it bright. Every 1,000 steps adds one to the lowest store.</p>
+      </details>
     </section>
+    <section class="panel" id="sheet"></section>
     <section>
       <p class="eyebrow">Since you arrived</p>
       <div class="stats" id="life" style="margin-top:.5rem"></div>
@@ -1527,18 +1577,16 @@ function renderStepLink(){
   const box = $('stepLink'); if (!box) return;
   if (!PUSH_URL){ box.hidden = true; return; }
   const open = box.querySelector('details') ? box.querySelector('details').open : null;
-  if (!stepCode) box.innerHTML = `<h3>Let your glim count for you</h3>
-    <p class="small muted">Connect the Health app on your iPhone and your steps reach your glim every hour without you typing them, even while the game is closed. Only a step count for each hour of today is sent. No location, and nothing else from Health.</p>
+  if (!stepCode) box.innerHTML = `<p class="small muted">Send steps from Health every hour. Step counts only, no location.</p>
     <button id="stepsOn"${stepLink.busy ? ' disabled' : ''}>${stepLink.busy ? 'Connecting…' : 'Connect my steps'}</button>${stepLink.msg ? `<p class="small" style="color:var(--warn)">${stepLink.msg}</p>` : ''}`;
-  else box.innerHTML = `<h3>Your phone counts for your glim</h3>
-    <p class="small num">${stepLink.at ? 'Your glim last heard from your phone ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'Your glim has not heard from your phone yet. Follow the steps below, then run the shortcut once.'}</p>
+  else box.innerHTML = `    <p class="small num">${stepLink.at ? 'Phone synced ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'No steps from your phone yet. Set up the shortcut below and run it once.'}</p>
     <details class="lochelp"${(open == null ? !stepLink.at : open) ? ' open' : ''}><summary>How to set up the shortcut</summary>${stepHelp()}</details>
     <div class="row"><button class="quiet" id="stepsCheck">Check now</button><button class="quiet" id="stepsOff">Disconnect</button></div>`;
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
   on('stepsOn', stepsConnect); on('stepsOff', stepsDisconnect); on('stepsCheck', stepsPull);
   on('stepCopy', async () => { try { await navigator.clipboard.writeText(stepUrl()); $('stepCopy').textContent = 'Copied'; } catch { $('stepUrlBox').select(); } });
 }
-let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
+let selHour = null, openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
 let relayOn = store.get('lwb-relay') === '1';   // the game's own server can speak for players with no key
 const aiOn = () => !!(sampleFn || apiKey || relayOn);
 if (window.claude && window.claude.use) window.claude.use('sample').then(f => { if (f){ sampleFn = f; renderCamp(); } }).catch(() => {});
@@ -2184,7 +2232,8 @@ function renderCamp(){
   $('hudCarry').textContent = 'Carry ' + carry();
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
-  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small>${n0[k] > 0 ? `<em>${Math.floor(S.stock[k] / n0[k]) === 1 ? '1 day' : Math.floor(S.stock[k] / n0[k]) + ' days'}</em>` : ''}</div>`).join('');
+  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => { const v = S.stock[k], days = n0[k] > 0 ? Math.floor(v / n0[k]) : null, low = n0[k] && v < n0[k] * 2;
+    return `<div class="${low ? 'low' : ''}" style="--c:${TINT[k]}" role="img" aria-label="${name}: ${v}${days == null ? '' : ', ' + days + (days === 1 ? ' day' : ' days') + ' left'}"><b>${v}</b><span class="col">${'<i></i>'.repeat(Math.min(12, v))}</span><small>${name.split(' ')[0]}</small><em>${days == null ? '' : days + (k === 'wood' ? (days === 1 ? ' night' : ' nights') : days === 1 ? ' day' : ' days')}</em></div>`; }).join('');
   { const sp = SPOTS.find(s => s.k === openSpot) || SPOTS[0], stage = villageStage(), box = $('spotBox');
     const face = who => pic('p-' + who, 'face sm');
     const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. ' + (lost()[who] ? 'The Unlit led ' + PEOPLE[who].name + ' away.' : 'The Tallymen have ' + PEOPLE[who].name + '.') : hurt}</span>`;
@@ -2232,12 +2281,12 @@ function renderCamp(){
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
     $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
-        <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
-      <ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
-        <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul>
+        <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${hi - x} XP to level ${lv + 1}</p></div></div>
+      <ul class="attrs four">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li aria-label="${a.name} ${L}. ${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}"><span class="small muted">${a.name}</span><b class="num">${L}</b>
+        <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><em class="num">${a.fmt(v)}</em></li>`; }).join('')}</ul>
       <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>${items().includes('boots') ? 'A hoodie, sweatpants, a Tallyman\'s cloak and a dead soldier\'s marching boots' : 'A hoodie, sweatpants, a Tallyman\'s cloak and foam clogs from another world'}</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
-      <p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Keep going back to the same places. Old tools and useful things turn up there, some for you and some for the camp.</p>'}
-      <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'You earn one point each level. XP comes from tasks, distance, workouts, repairs and what you find.'}</p>
+      <p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Old tools turn up at places you go back to.</p>'}
+      <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'One point each level.'}</p>
       <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul>`;
     $('sheet').querySelectorAll('button[data-perk]').forEach(btn => btn.onclick = () => {
       const k = PERKS.find(q => q.k === btn.dataset.perk), n = perks()[k.k] || 0; if (points() < 1 || n >= k.max) return;
@@ -2295,31 +2344,54 @@ function renderCamp(){
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
   renderStepLink();
   { const CS2 = campState(), w = $('campWarn'), alarm = CS2.warn || ['Watched', 'Marked', 'Dark'].includes(CS2.mood);
-    w.hidden = !alarm; w.textContent = alarm ? CS2.line + ' ' + (CS2.warn || '') + ' Any walk you finish brings home wood for the fire.' : '';
+    const N2 = neglect(), nights = Math.floor(S.stock.wood / needs().wood), stage = Math.min(3, N2.stage || 0), lit = fireLit();
+    w.hidden = !(stage || !lit); w.textContent = stage ? CS2.line : CS2.warn;
+    $('fireBox').innerHTML = `<div class="firebox${nights < 2 ? ' low' : ''}${lit ? '' : ' out'}" role="img" aria-label="Night fire: wood for ${nights} ${nights === 1 ? 'night' : 'nights'}${stage ? '. The Unlit are at step ' + stage + ' of 3' : ''}">
+      <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${lit ? '<path fill="#FF8A4C" d="M7 1h2v2h2v3h2v5h-1v2h-2v1H6v-1H4v-2H3V7h2V4h2z"/><path fill="#FFD47A" d="M7 6h2v3h1v3H9v1H7v-1H6V9h1z"/>' : '<path fill="#4a5661" d="M3 12h10v2H3zM5 10h6v2H5z"/>'}<path fill="#B98A5A" d="M2 14h12v1H2z"/></svg>
+      <div><b>${lit ? 'Fire' : 'Fire out'}<small>${nights} ${nights === 1 ? 'night' : 'nights'} of wood</small></b><span class="seg">${Array.from({length:5}, (_, i) => `<i class="${i < nights ? 'on' : ''}"></i>`).join('')}</span>
+      ${stage ? `<span class="unlit">The Unlit ${[1, 2, 3].map(i => `<i class="${i <= stage ? 'on' : ''}"></i>`).join('')} ${['', 'at the edge', 'at the door', 'in the camp'][stage]}</span>` : ''}</div></div>`;
     { const t = todaysTurn(), tb = $('taleBox');
       tb.innerHTML = t ? `<button class="bare tale" id="taleGo">${pic('p-' + t.who, 'face sm')}<span><span class="eyebrow">Today at Hollow Ash</span><span class="small">${esc(t.scene)}</span>${t.line ? `<span class="say">${PEOPLE[t.who].name}: "${esc(t.line)}"</span>` : ''}${t.favour && favourOpen() ? `<span class="small muted">${PEOPLE[t.who].name} has asked something of you. It is on the board.</span>` : ''}</span></button>` : '';
       if ($('taleGo')) $('taleGo').onclick = () => openPersonSheet(t.who); }
     const waiting = asks(), a = waiting[0];
-    $('askBox').innerHTML = a ? `<button class="bare ask" id="askGo">${pic('p-' + a.who, 'face sm')}<span><h3>${PEOPLE[a.who].name} is asking for you</h3><span class="small muted">${esc(a.t)}. ${esc(a.sub)}</span></span></button>` : `<p class="small muted">Nobody is asking anything of you just now. ${esc(CS2.line)}</p>`;
+    $('askBox').innerHTML = a ? `<button class="bare ask" id="askGo">${pic('p-' + a.who, 'face sm')}<span><h3>${PEOPLE[a.who].name} is asking for you</h3><span class="small muted">${esc(a.t)}. ${esc(a.sub)}</span></span></button>` : '';
     if ($('askGo')) $('askGo').onclick = () => { sheet = ''; showTab('walk'); window.scrollTo(0, 0); };
     $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
-      return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? (lost()[k] ? 'led away by the Unlit' : 'taken by the Tallymen') : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? (lost()[k] ? 'gone' : 'taken') : m.word}</em></button>`; }).join('');
+      return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? (lost()[k] ? 'led away by the Unlit' : 'taken by the Tallymen') : m.word + ', trust ' + S.trust[k] + ' of 10'}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span class="tr">${Array.from({length:10}, (_, i) => `<u class="${!gone && i < S.trust[k] ? 'on' : ''}"></u>`).join('')}</span><span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? (lost()[k] ? 'gone' : 'taken') : m.word}</em></button>`; }).join('');
     $('fire').querySelectorAll('button').forEach(b => b.onclick = () => openPersonSheet(b.dataset.person));
     const rows = [], nr = REPAIRS.find(r => !S.fixed[r.k]), nb = nextBuild();
     if (nr) rows.push(['house', nr.bad]);
     if (nb && !S.built[nb.k] && !rows.some(r => r[0] === nb.spot)) rows.push([nb.spot, nb.bad]);
     BUILDS.filter(b => b.side && !S.built[b.k] && !rows.some(r => r[0] === b.spot)).forEach(b => rows.push([b.spot, b.bad]));
-    $('missing').innerHTML = rows.length ? `<p class="eyebrow">What the camp is missing</p><div class="pack">${rows.map(r => `<button class="bare" data-spot="${r[0]}"><h3>${(SPOTS.find(sp => sp.k === r[0]) || {name:'Camp'}).name}</h3><span>${esc(r[1] || '')}</span></button>`).join('')}</div>` : '';
+    $('missing').innerHTML = rows.length ? `<p class="eyebrow">Needs fixing</p><div class="chipsrow">${rows.map(r => `<button class="bare" data-spot="${r[0]}" title="${esc(r[1] || '')}">${(SPOTS.find(sp => sp.k === r[0]) || {name:'Camp'}).name}</button>`).join('')}</div>` : '';
     $('missing').querySelectorAll('button').forEach(b => b.onclick = () => { openSpot = b.dataset.spot; tapN++; openSheet('place'); });
     $('pack').innerHTML = [['journal', 'Journal', S.journal.length + (S.journal.length === 1 ? ' entry' : ' entries')], ['finds', 'Old empire finds', frags().length ? frags().length + ' found' : 'Nothing yet'], ['map', 'Map of the known world', Object.keys(S.places || {}).length + (Object.keys(S.places || {}).length === 1 ? ' place' : ' places')], ['phone', 'Your phone', 'Dead. Settings are kept here.']]
       .map(r => `<button class="bare" data-open="${r[0]}"><h3>${r[1]}</h3><span>${r[2]}</span></button>`).join('');
     $('pack').querySelectorAll('button').forEach(b => b.onclick = () => openSheet(b.dataset.open)); }
-  { const cm = campMood(), cl = $('campLine'); if (cl) cl.textContent = cm.line;
+  { const cm = campMood(), cl = $('campLine'); if (cl) cl.textContent = 'Hollow Ash is ' + cm.word + '.';
     const box = $('tallyNow'), y = S.dayStart && S.dayStart.date === today() ? tally() : null;
     if (box) box.innerHTML = y ? `<button class="quiet" id="tallyAsk" style="align-self:flex-start">${tallyOpen ? 'That will do' : 'See the day so far'}</button>${tallyOpen ? tallyHtml(y) : ''}` : '';
     if ($('tallyAsk')) $('tallyAsk').onclick = () => { tallyOpen = !tallyOpen; renderCamp(); }; }
-  { const g = glim(); $('glimOrb').style.setProperty('--b', g.b); $('glimLine').textContent = 'It is ' + g.word + '.' + (g.next ? ' ' + (g.next - g.n).toLocaleString() + ' more steps and it burns brighter.' : ' It cannot burn brighter than this.'); }
-  $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
+  { const g = glim(), r = roundsToday(), rn = roundCount(r), ds = S.dayStart && S.dayStart.date === today() ? S.dayStart : null, walks = ds ? Math.max(0, S.stats.tasks - ds.tasks) : 0;
+    const ring = (rad, frac, c) => { const k = frac > 0 ? Math.max(1, Math.min(20, Math.floor(frac * 20))) : 0;
+      return `<circle cx="75" cy="75" r="${rad}" pathLength="100" stroke="${c}" opacity=".22" stroke-dasharray="4.2 .8"/>${k ? `<circle cx="75" cy="75" r="${rad}" pathLength="100" stroke="${c}" stroke-dasharray="${Array(k).fill('4.2 .8').join(' ')} 0 100"/>` : ''}`; };
+    const hrs = roundHours(), any = hrs.some(h => r.hours[h] > 0), top = Math.max(1000, ...hrs.map(h => r.hours[h] || 0)), nowH = new Date().getHours(), lab = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
+    const ti = [0, 1000, 4000, 7000, 10000].filter(t => g.n >= t).length - 1, words = ['guttering', 'low', 'steady', 'bright', 'blazing'];
+    if (selHour != null && !(r.hours[selHour] >= 0)) selHour = null;
+    $('todayBox').innerHTML = `<div class="rings"><div class="ringpic" role="img" aria-label="Today: ${g.n.toLocaleString()} of 10,000 steps, ${rn} of ${ROUND.cap} rounds, ${walks} ${walks === 1 ? 'walk' : 'walks'} finished">
+        <svg viewBox="0 0 150 150">${ring(68, g.n / 10000, 'var(--gold)')}${ring(54, rn / ROUND.cap, 'var(--water)')}${ring(40, walks / 1, 'var(--ember)')}</svg>${glimOrb()}</div>
+      <ul class="ringkey"><li style="--c:var(--gold)"><i></i><b>${g.n.toLocaleString()}<small> / 10,000</small></b><span>Steps</span></li>
+        <li style="--c:var(--water)"><i></i><b>${rn}<small> / ${ROUND.cap}</small></b><span>Rounds</span></li>
+        <li style="--c:var(--ember)"><i></i><b>${walks}<small> / 1</small></b><span>Walk home</span></li></ul></div>
+      ${any ? `<div class="hours">${hrs.map(h => { const v = r.hours[h] || 0; return `<button data-h="${h}" class="${v < ROUND.steps ? 'dim' : ''}${h === nowH ? ' now' : ''}" aria-pressed="${selHour === h}" aria-label="${lab(h)}: ${v.toLocaleString()} steps"><i style="height:${v ? Math.max(4, Math.round(v / top * 100)) : 0}%"></i></button>`; }).join('')}</div>
+      <div class="hrow" aria-hidden="true">${hrs.map(h => `<u class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : ''}"></u>`).join('')}</div>
+      <div class="hrow" aria-hidden="true"><span style="grid-column:1/7">6a</span><span style="grid-column:7/13">12p</span><span style="grid-column:13/16">6p</span><span>9p</span></div>
+      <p class="hcap">${selHour != null ? lab(selHour) + ' · ' + (r.hours[selHour] || 0).toLocaleString() + ' steps' + ((r.hours[selHour] || 0) >= ROUND.steps ? ' · round walked' : '') : 'Steps by hour. Blue marks a round walked.'}</p>` : ''}
+      <div class="meter" role="img" aria-label="Your glim is ${g.word}"><span class="seg" style="--c:var(--gold)">${words.map((_, i) => `<i class="${i <= ti ? 'on' : ''}"></i>`).join('')}</span>
+        <div class="lab"><b>Glim ${g.word}</b><span class="num">${g.next ? (g.next - g.n).toLocaleString() + ' to ' + words[ti + 1] : 'as bright as it gets'}</span></div></div>`;
+    $('todayBox').querySelectorAll('.hours button').forEach(b => b.onclick = () => { selHour = selHour === +b.dataset.h ? null : +b.dataset.h; renderCamp(); });
+    const man = $('stepManual'); if (man && !man.dataset.set){ man.dataset.set = 1; man.open = !stepCode; } }
+  $('stepLine').textContent = sl.steps ? 'Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : '';
   { const r = roundsToday(), n = roundCount(r), nowH = new Date().getHours(), lab = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p'), any = Object.keys(r.hours).length;
     $('roundPips').innerHTML = roundHours().map(h => `<span class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : h === nowH ? 'now' : ''}"><i></i>${lab(h)}</span>`).join('');
     $('roundPips').setAttribute('aria-label', n + ' rounds walked today');
