@@ -232,7 +232,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
       <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem">
         <h3>Ask your glim</h3>
-        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a doot, the same doot it makes when you take a step. Two doots with the second one higher is yes. Two with the second one lower is no. Three doots are the soft answers: the last one higher is maybe, the last one lower means it is not sure. Turn your ring switch on to hear it.</p>
+        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a soft pulse of light, the same one it makes when you take a step. Two pulses with the second sliding higher is yes. Two with the second sliding lower is no. Three pulses are the soft answers: the last one higher is maybe, the last one lower means it is not sure. Turn your ring switch on to hear it.</p>
         <div class="row">
           <input class="grow" style="flex-basis:8rem" type="text" id="glimAsk" maxlength="200" placeholder="Is Pip all right?">
           <button id="glimAskBtn">Ask</button>
@@ -998,28 +998,44 @@ function chime(notes){
   } catch {}
 }
 /* The glim's voice, until it has words: a high rising pair for yes, a low falling pair for no, a wavering note for not knowing. */
+/* The glim's voice. It is a dot of light, so nothing is struck: each note swells in, then throbs outward in fading waves, in a soft hall. */
+let glimHall = null;
+function glimOut(){
+  if (glimHall) return glimHall;
+  const len = Math.floor(actx.sampleRate * 1.5), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+  let lp = 0; for (let i = 0; i < len; i++){ lp += ((Math.random() * 2 - 1) - lp) * .25; d[i] = lp * Math.exp(-i / actx.sampleRate * 4.6); }
+  const dry = actx.createGain(), wet = actx.createGain(), conv = actx.createConvolver(), inp = actx.createGain();
+  conv.buffer = buf; dry.gain.value = .7; wet.gain.value = .5;
+  inp.connect(dry).connect(actx.destination); inp.connect(conv).connect(wet).connect(actx.destination);
+  return glimHall = inp;
+}
+function glimNote(t, f1, f2, o){
+  const L = o.L || .22, rel = o.rel || .28, att = o.att || .05, vol = (o.vol || 1) * .32, end = t + L + rel * 4;
+  const g = actx.createGain(), trem = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + att); g.gain.setValueAtTime(vol, t + L); g.gain.setTargetAtTime(0.0001, t + L, rel);
+  [[1, 1], [2, .12]].forEach(([m, a]) => {
+    const osc = actx.createOscillator(), h = actx.createGain(); osc.type = 'sine'; h.gain.value = a;
+    osc.frequency.setValueAtTime(f1 * m, t); osc.frequency.setValueAtTime(f1 * m, t + L * .1); osc.frequency.exponentialRampToValueAtTime((f2 || f1) * m, t + L * .75);
+    osc.connect(h).connect(g); osc.start(t); osc.stop(end);
+  });
+  if (!o.plain){ // the waves of light: a slow throb that comes in as the note lets go
+    const lfo = actx.createOscillator(), depth = actx.createGain(); lfo.frequency.value = 8;
+    depth.gain.setValueAtTime(0, t + L * .5); depth.gain.linearRampToValueAtTime(.28, t + L * .5 + .3);
+    trem.gain.value = .72; lfo.connect(depth).connect(trem.gain); lfo.start(t); lfo.stop(end);
+  }
+  g.connect(trem).connect(glimOut());
+}
 function glimTone(kind){
   try {
     unlockSound(); if (!actx) return;
-    const t0 = actx.currentTime + .05;
-    // One voice for everything the glim says: a short round "doot". It starts a touch sharp and settles, then stops clean.
-    const doot = (f, t, vol) => {
-      [[1, 1], [2, .22]].forEach(([m, part]) => {
-        const o = actx.createOscillator(), g = actx.createGain(), v = (vol || .4) * part;
-        o.type = 'sine'; o.frequency.setValueAtTime(f * m * 1.1, t); o.frequency.exponentialRampToValueAtTime(f * m, t + .03);
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + .008); g.gain.setValueAtTime(v, t + .09); g.gain.exponentialRampToValueAtTime(0.0001, t + .15);
-        o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .18);
-      });
-    };
-    const B = GLIM_DOOT;
-    doot(B.step, t0, kind === 'step' ? .3 : .4);
-    if (kind === 'yes') doot(B.up, t0 + B.gap);
-    else if (kind === 'no') doot(B.down, t0 + B.gap);
-    else if (kind === 'maybe' || kind === 'unsure'){ doot(B.step, t0 + B.gap); doot(kind === 'maybe' ? B.up : B.down, t0 + B.gap * 2); }
+    const t = actx.currentTime + .05, B = GLIM_DOOT, g = B.gap, soft = {rel:.18};
+    if (kind === 'step') glimNote(t, B.step, 0, {L:.08, rel:.09, att:.025, plain:true});
+    else if (kind === 'yes' || kind === 'no'){ glimNote(t, B.step, 0, {}); glimNote(t + g, B.step, kind === 'yes' ? B.up : B.down, {}); }
+    else { glimNote(t, B.step, 0, soft); glimNote(t + g * .8, B.step, 0, soft); glimNote(t + g * 1.6, B.step, kind === 'maybe' ? B.up : B.down, {}); }
   } catch {}
 }
-const GLIM_DOOT = {step:587.3, up:784, down:440, gap:.2};
-const GLIMSAY = {step:'Doot. One step.', yes:'Doot, doot, the second one higher. Yes.', no:'Doot, doot, the second one lower. No.', maybe:'Doot, doot, doot, the last one higher. Maybe.', unsure:'Doot, doot, doot, the last one lower. It is not sure.'};
+const GLIM_DOOT = {step:587.3, up:784, down:440, gap:.42};
+const GLIMSAY = {step:'One soft pulse. A step.', yes:'Two pulses, the second sliding higher. Yes.', no:'Two pulses, the second sliding lower. No.', maybe:'Three pulses, the last sliding higher. Maybe.', unsure:'Three pulses, the last sliding lower. It is not sure.'};
 let glimBusy = false;
 async function askGlim(){
   const q = $('glimAsk').value.trim(), out = $('glimAns'); if (!q || glimBusy) return;
