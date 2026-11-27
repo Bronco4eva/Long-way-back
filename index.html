@@ -853,6 +853,7 @@ function tally(){
 }
 // What to show on the board: a day you never heard the tally for, or today's once evening comes.
 function tallyDue(){
+  if (S.start && S.stats.tasks < 1) return null;   // no reckoning on the night you arrive
   if (S.missed) return Object.assign({old:true}, S.missed);
   if (S.dayStart && S.dayStart.date === today() && S.recapSeen !== today() && new Date().getHours() >= TALLY_HOUR) return tally();
   return null;
