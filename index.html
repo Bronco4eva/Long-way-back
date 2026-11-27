@@ -183,6 +183,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
         <button id="stepBtn">Log steps</button>
       </div>
       <p class="small num" id="stepLine"></p>
+      <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
     <section class="panel">
       <div class="thead"><img class="face sm" src="art/p-tobiah.jpg" alt="" onerror="this.hidden=true"><h2>Tobiah's rounds</h2></div>
@@ -1132,6 +1133,73 @@ function readSaveCode(text){
 
 /* ---------- AI voices: the game owns the facts, the AI only speaks ---------- */
 let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb-model') || 'claude-opus-5-5';
+/* Steps straight from the phone's Health app. A shortcut on the phone hands the reminder server a step count for each
+   hour of today; the game picks it up from there whenever it is opened. The code is this phone's own and is kept only here. */
+let stepCode = store.get('lwb-steps-code') || '', stepLink = {busy:false, msg:'', at:+store.get('lwb-steps-at') || 0};
+const stepUrl = () => PUSH_URL + '/steps/' + stepCode + '?hours=';
+async function stepsCall(path){
+  let endpoint; try { const sub = pushCapable() ? await pushSub() : null; if (sub) endpoint = sub.endpoint; } catch {}
+  const r = await fetch(PUSH_URL + path, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({code:stepCode, endpoint})});
+  return {status:r.status, body:await r.json().catch(() => ({}))};
+}
+async function stepsConnect(){
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  stepLink.busy = true; stepLink.msg = ''; renderCamp();
+  const fresh = !stepCode; if (fresh) stepCode = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => abc[b % abc.length]).join('');
+  try {
+    const {status} = await stepsCall('/steps-on');
+    if (status === 200) store.set('lwb-steps-code', stepCode);
+    else { if (fresh) stepCode = ''; stepLink.msg = status === 429 ? 'The camp has no room for another tally just now. Try again another day.' : 'That did not go through. Try again in a moment.'; }
+  } catch { if (fresh) stepCode = ''; stepLink.msg = 'Could not reach the server. Check your signal and try again.'; }
+  stepLink.busy = false; renderCamp();
+}
+async function stepsDisconnect(){
+  try { await stepsCall('/steps-off'); } catch {}
+  stepCode = ''; stepLink.at = 0; stepLink.msg = '';
+  try { localStorage.removeItem('lwb-steps-code'); localStorage.removeItem('lwb-steps-at'); } catch {}
+  renderCamp();
+}
+async function stepsPull(){
+  if (!PUSH_URL || !stepCode || !S.home) return;
+  try {
+    const {status, body} = await stepsCall('/steps-read');
+    if (status === 404){ await stepsCall('/steps-on'); return; }   // the server forgot a code left unused for a month; give it back
+    if (!body.ok || !body.at) return;
+    const news = body.at !== stepLink.at; stepLink.at = body.at; store.set('lwb-steps-at', String(body.at));
+    if (new Date(body.at).toLocaleDateString('en-CA') !== today()){ if (news) renderCamp(); return; }   // yesterday's count is not today's
+    const got = logHours(body.hours || {});
+    if (got.earned || got.chores) shortcutNews = 'Your phone told Pip: ' + (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
+    render();
+  } catch {}
+}
+const stepHelp = () => `<p class="small muted">One shortcut in the iPhone Shortcuts app does this. It has not been tried on a real phone yet, so say where it goes wrong.</p>
+  <label for="stepUrlBox">Your phone's own link</label>
+  <div class="row"><input class="grow" style="flex-basis:8rem;min-width:0;min-height:44px;padding:.5rem .6rem;font:400 .875rem Barlow,system-ui,sans-serif;color:var(--muted);background:var(--bg);border:2px solid var(--line);border-radius:4px" id="stepUrlBox" readonly value="${stepUrl()}"><button id="stepCopy">Copy</button></div>
+  <p class="small muted">Keep this link to yourself. Anyone who has it could send Pip a step count in your name, and nothing more.</p>
+  <ol>
+  <li>Tap Copy above. Then open Shortcuts, tap +, and name the new shortcut Pip's tally.</li>
+  <li>Add the action Find Health Samples. Set Type to Steps. Add the filter Start Date is today. Set Group By to Hour and Sort By to Start Date.</li>
+  <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen.</li>
+  <li>Below End Repeat add Combine Text, with Custom separator <b>_</b> (an underscore).</li>
+  <li>Add a URL action. Paste the link, and put the Combined Text right after the equals sign at its end.</li>
+  <li>Add Get Contents of URL.</li>
+  <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here: Pip should have your steps.</li>
+  <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Pip's tally. Add one for each hour you want counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>`;
+function renderStepLink(){
+  const box = $('stepLink'); if (!box) return;
+  if (!PUSH_URL){ box.hidden = true; return; }
+  const open = box.querySelector('details') ? box.querySelector('details').open : null;
+  if (!stepCode) box.innerHTML = `<h3>Let Pip count for you</h3>
+    <p class="small muted">Connect the Health app on your iPhone and your steps reach Pip every hour without you typing them, even while the game is closed. Only a step count for each hour of today is sent. No location, and nothing else from Health.</p>
+    <button id="stepsOn"${stepLink.busy ? ' disabled' : ''}>${stepLink.busy ? 'Connecting…' : 'Connect my steps'}</button>${stepLink.msg ? `<p class="small" style="color:var(--warn)">${stepLink.msg}</p>` : ''}`;
+  else box.innerHTML = `<h3>Your phone counts for Pip</h3>
+    <p class="small num">${stepLink.at ? 'Pip last heard from your phone ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'Pip has not heard from your phone yet. Follow the steps below, then run the shortcut once.'}</p>
+    <details class="lochelp"${(open == null ? !stepLink.at : open) ? ' open' : ''}><summary>How to set up the shortcut</summary>${stepHelp()}</details>
+    <div class="row"><button class="quiet" id="stepsCheck">Check now</button><button class="quiet" id="stepsOff">Disconnect</button></div>`;
+  const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
+  on('stepsOn', stepsConnect); on('stepsOff', stepsDisconnect); on('stepsCheck', stepsPull);
+  on('stepCopy', async () => { try { await navigator.clipboard.writeText(stepUrl()); $('stepCopy').textContent = 'Copied'; } catch { $('stepUrlBox').select(); } });
+}
 let openTalk = '', talkBusy = false, talkErr = '', openSpot = 'house', tapN = 0, shortcutNews = '';
 let relayOn = store.get('lwb-relay') === '1';   // the game's own server can speak for players with no key
 const aiOn = () => !!(sampleFn || apiKey || relayOn);
@@ -1651,6 +1719,7 @@ function renderCamp(){
   });
   $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
+  renderStepLink();
   $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
   { const r = roundsToday(), n = roundCount(r), nowH = new Date().getHours(), lab = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p'), any = Object.keys(r.hours).length;
     $('roundPips').innerHTML = roundHours().map(h => `<span class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : h === nowH ? 'now' : ''}"><i></i>${lab(h)}</span>`).join('');
@@ -1735,7 +1804,8 @@ if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
   try { history.replaceState(null, '', location.pathname); } catch {}
 }
 if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; try { history.replaceState(null, '', location.pathname); } catch {} }
-boot(); pushRefresh();
+boot(); pushRefresh(); stepsPull();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) stepsPull(); });
 if (PUSH_URL) fetch(PUSH_URL + '/').then(r => r.json()).then(j => { const on = !!(j && j.talk); if (on !== relayOn){ relayOn = on; store.set('lwb-relay', on ? '1' : '0'); render(); } }).catch(() => {});
 { const got = checkWalk(); if (got && got.earned){ shortcutNews = 'Round walked while you were away. Tobiah nodded.'; render(); } }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.walk){ const got = checkWalk(); if (got){ shortcutNews = got.earned ? 'Round walked. Tobiah nodded.' : 'Round walked.'; render(); } } });

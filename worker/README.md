@@ -18,3 +18,12 @@ Check it locally with `npm install && npm test`.
 - The server keeps a daily count against a scrambled internet address and stores none of the words.
 - Requests ask Anthropic to hand a declined request to a fallback model (`fallbacks: "default"`), and retry without that option if it is not accepted.
 - Set a monthly spend limit in the Claude Console as the real backstop.
+
+## Steps from the Health app
+
+A shortcut on the player's iPhone calls `GET /steps/<code>?hours=9-320_10-45` with today's step count for each hour. The game makes the code (`POST /steps-on`), reads the counts back (`POST /steps-read`) and can remove them (`POST /steps-off`).
+
+- Stores only the hourly counts for the day and when they arrived, under a scrambled form of the code. No location and nothing else from Health.
+- A code the game never registered is refused, so nobody else can fill the storage.
+- An unchanged count is not written again, to stay inside the free plan's daily write limit.
+- If the phone also takes Tobiah's calls, he skips an hour in which the phone has already reported 250 steps.

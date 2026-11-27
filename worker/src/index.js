@@ -7,6 +7,32 @@ const CONTACT = 'https://bronco4eva.github.io/Long-way-back/';
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
 const MAX_PHONES = 200;
 
+// Steps from a phone's Health app. An iPhone shortcut calls /steps/<code> with today's count for each hour; the game,
+// which made the code, reads it back. We keep the hourly counts for the day and when they came. Nothing else from Health.
+const STEPS = {round:250, fresh:70 * 60000, keep:30 * 86400, sameFor:6 * 3600000};
+const codeOk = c => typeof c === 'string' && /^[A-Za-z0-9]{20,40}$/.test(c);
+const stepsKey = async code => 'steps:' + hex(await crypto.subtle.digest('SHA-256', enc.encode('steps|' + code))).slice(0, 32);
+// "9-320_10-45_14-1,200" -> {9:320, 10:45, 14:1200}. Hours the phone left out had no steps.
+export function parseHours(text){
+  const out = {};
+  String(text || '').split('_').slice(0, 48).forEach(part => {
+    const m = /^\s*(\d{1,2})\s*-\s*([\d.,\s]+)/.exec(part); if (!m) return;
+    const h = +m[1], n = +m[2].trim().replace(/[.,]\d{1,2}$/, '').replace(/\D/g, '');
+    if (h > 23 || !(n >= 0) || n > 60000) return;
+    out[h] = Math.min(60000, (out[h] || 0) + n);
+  });
+  return out;
+}
+export async function takeSteps(env, code, text, now = Date.now()){
+  if (!codeOk(code)) return [{error:'bad code'}, 400];
+  const name = await stepsKey(code), rec = await env.SUBS.get(name, 'json');
+  if (!rec) return [{error:'This code is not known. Open the game and connect your steps again.'}, 404];   // only the game can make a code
+  const hours = parseHours(text), total = Object.values(hours).reduce((a, b) => a + b, 0);
+  // Storage writes are counted on the free plan, so an hour with nothing new is not written again.
+  if (JSON.stringify(hours) !== JSON.stringify(rec.hours) || now - rec.at > STEPS.sameFor) await env.SUBS.put(name, JSON.stringify({hours, at:now}), {expirationTtl:STEPS.keep});
+  return [{ok:true, steps:total}, 200];
+}
+
 // Villager voices for players who have no key of their own. The key is a secret on this server (ANTHROPIC_API_KEY)
 // and never reaches a phone. Caps are counted per day against a scrambled internet address; no words are stored.
 const TALK = {perPlayer:40, everyone:400, maxSystem:16000, maxTurns:30, maxTurnChars:2000, maxTokens:2000, model:'claude-opus-5-5'};
@@ -100,6 +126,10 @@ export async function runNudges(env, now = new Date()){
     const h = localHour(rec.tz, now);
     if (h < rec.from || h >= rec.to) continue;                 // outside the hours they asked for
     if (rec.quietUntil && rec.quietUntil > now.getTime()) continue;   // they walked a moment ago
+    if (rec.steps){                                            // their phone says they have already walked this hour
+      const st = await env.SUBS.get(rec.steps, 'json');
+      if (st && now.getTime() - st.at < STEPS.fresh && localHour(rec.tz, new Date(st.at)) === h && (st.hours[h] || 0) >= STEPS.round) continue;
+    }
     const status = await sendPush(env, rec.sub, nudge());
     if (status === 404 || status === 410) await env.SUBS.delete(name); else sent++;
   }
@@ -151,6 +181,11 @@ export default {
       seen:Object.keys(env).filter(k => /anthropic|api|key/i.test(k)).map(k => ({name:JSON.stringify(k), type:typeof env[k], empty:typeof env[k] !== 'string' || env[k].trim().length === 0})),
       at:new Date().toISOString()}, 200, origin);
     if (request.method === 'GET' && url.pathname === '/key') return reply({key:(await vapid(env)).pub}, 200, origin);
+    // The one call that does not come from the game: the phone's shortcut, which has no page behind it.
+    if (url.pathname.startsWith('/steps/')){
+      const [body, status] = await takeSteps(env, url.pathname.slice(7), url.searchParams.get('hours'));
+      return reply(body, status, origin);
+    }
     if (request.method !== 'POST') return reply({error:'not found'}, 404, origin);
     if (origin !== GAME_ORIGIN) return reply({error:'only the game may call this'}, 403, origin);
     let j; try { j = await request.json(); } catch { return reply({error:'bad request'}, 400, origin); }
@@ -160,8 +195,30 @@ export default {
     if (url.pathname === '/subscribe'){
       if (!validSub(j.sub) || !hourOk(j.from) || !hourOk(j.to) || j.from >= j.to || localHour(String(j.tz)) < 0) return reply({error:'bad request'}, 400, origin);
       const name = await keyFor(j.sub.endpoint);
-      if (!(await env.SUBS.get(name)) && (await listPhones(env)).length >= MAX_PHONES) return reply({error:'full'}, 429, origin);
-      await env.SUBS.put(name, JSON.stringify({sub:{endpoint:j.sub.endpoint, keys:{p256dh:j.sub.keys.p256dh, auth:j.sub.keys.auth}}, tz:String(j.tz), from:j.from, to:j.to, quietUntil:0}));
+      const was = await env.SUBS.get(name, 'json');
+      if (!was && (await listPhones(env)).length >= MAX_PHONES) return reply({error:'full'}, 429, origin);
+      await env.SUBS.put(name, JSON.stringify({sub:{endpoint:j.sub.endpoint, keys:{p256dh:j.sub.keys.p256dh, auth:j.sub.keys.auth}}, tz:String(j.tz), from:j.from, to:j.to, quietUntil:0, ...(was && was.steps ? {steps:was.steps} : {})}));
+      return reply({ok:true}, 200, origin);
+    }
+    if (url.pathname === '/steps-on' || url.pathname === '/steps-read' || url.pathname === '/steps-off'){
+      if (!codeOk(j.code)) return reply({error:'bad request'}, 400, origin);
+      const sName = await stepsKey(j.code), st = await env.SUBS.get(sName, 'json');
+      // If this phone also takes Tobiah's calls, tie the two together so he does not call in an hour already walked.
+      const pName = typeof j.endpoint === 'string' ? await keyFor(j.endpoint) : null, phone = pName ? await env.SUBS.get(pName, 'json') : null;
+      if (url.pathname === '/steps-read'){
+        if (st && phone && phone.steps !== sName){ phone.steps = sName; await env.SUBS.put(pName, JSON.stringify(phone)); }
+        return st ? reply({ok:true, hours:st.hours, at:st.at}, 200, origin) : reply({error:'not connected'}, 404, origin);
+      }
+      if (url.pathname === '/steps-off'){
+        await env.SUBS.delete(sName);
+        if (phone && phone.steps){ delete phone.steps; await env.SUBS.put(pName, JSON.stringify(phone)); }
+        return reply({ok:true}, 200, origin);
+      }
+      if (!st){
+        if ((await env.SUBS.list({prefix:'steps:', limit:MAX_PHONES})).keys.length >= MAX_PHONES) return reply({error:'full'}, 429, origin);
+        await env.SUBS.put(sName, JSON.stringify({hours:{}, at:0}), {expirationTtl:STEPS.keep});
+      }
+      if (phone && phone.steps !== sName){ phone.steps = sName; await env.SUBS.put(pName, JSON.stringify(phone)); }
       return reply({ok:true}, 200, origin);
     }
     const name = typeof j.endpoint === 'string' ? await keyFor(j.endpoint) : null;
