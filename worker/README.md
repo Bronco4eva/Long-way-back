@@ -14,10 +14,18 @@ Check it locally with `npm install && npm test`.
 
 `POST /talk` lets players without their own key talk to the villagers. Add the key once as a secret named `ANTHROPIC_API_KEY` on the Worker (Settings, Variables and Secrets). It is never sent to a phone.
 
-- Limits: 40 replies a day per player and 400 a day in total. Change them with the plain variables `TALK_PER_PLAYER` and `TALK_EVERYONE`. `TALK_MODEL` picks the model (default `claude-opus-5-5`).
-- The server keeps a daily count against a scrambled internet address and stores none of the words.
+- Limits: 40 replies a day per player and 400 calls a day in total. Change them with the plain variables `TALK_PER_PLAYER` and `TALK_EVERYONE`. `TALK_MODEL` picks the model (default `claude-opus-5-5`).
+- Each copy of the game makes its own random player code and sends it with every call. The server keeps one record a month against a scrambled form of that code: today's counts, the month's counts and the month's story tokens. It stores none of the words. A page from before player codes is counted against a scrambled internet address instead.
 - Requests ask Anthropic to hand a declined request to a fallback model (`fallbacks: "default"`), and retry without that option if it is not accepted.
 - Set a monthly spend limit in the Claude Console as the real backstop.
+
+## The story that adapts to each player
+
+`POST /story` is the same relay with two differences: it has its own daily count (12 a day per player, `STORY_PER_PLAYER`), and the server fixes the shape of the answer, so a story turn can only ever be a scene, a line, a thread and at most one favour. The game writes the request from the player's save and checks every part of the answer before it touches the save. `kind` is `turn` (one small turn of the story, once a day) or `recall` (rewriting the few lines a villager remembers of the player after a talk).
+
+`POST /usage` with the player code returns the plan, today's counts, the limits and the month's totals. The game shows them on the phone screen.
+
+Plans, for a later subscription: `PLANS` in `src/index.js` holds what each plan allows in a day (`free` 40 replies and 12 story calls, `paid` 200 and 40). A player is on `paid` when storage holds the line `plan:<scrambled code>` = `paid`. Nothing writes that line yet; a payment page would. There are no accounts and no payments in this code.
 
 ## Steps from the Health app
 
