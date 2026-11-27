@@ -45,7 +45,12 @@ p{margin:0}
 .hud-stores small{font:500 .6875rem var(--body);color:var(--muted);white-space:nowrap}
 /* screen tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom, 0px)}
-.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+.looks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.looks button.bare{display:block;border:3px solid transparent;border-radius:6px;padding:2px}.looks button.bare.on{border-color:var(--ember)}.looks .face{display:block;width:100%;height:auto;aspect-ratio:1}
+.glimtap{display:flex!important;flex-direction:column;align-items:center;gap:.3rem;width:100%;padding:1rem 0!important;text-align:center!important;color:var(--ember)!important;font:500 1rem var(--body)!important}
+.climb{display:flex;align-items:center;gap:14px;margin:.4rem 0 .6rem}.climb .big{font-size:3rem;line-height:1}.climb p{margin:.2rem 0 0}
+.fire .shade{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8125rem;color:var(--muted);text-align:center}.fire .shade .face{filter:brightness(0) opacity(.55)}
+.newsrow{display:flex;gap:10px;align-items:center}.looks.six{grid-template-columns:repeat(6,1fr);gap:4px}
 .tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:58px;padding:.3rem .05rem;font:400 1.4rem var(--display);color:var(--muted);margin-top:-2px}
 .tabs button[aria-current="true"]{color:var(--ember);border-top-color:var(--ember)}
 .col{display:flex;flex-direction:column;gap:1.1rem}
@@ -201,12 +206,13 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <p class="small alarm" id="campWarn" hidden></p>
     <div class="banner" id="newsBanner" hidden style="border-color:var(--moss)"><span id="newsText"></span><button class="quiet" id="newsOk">Good</button></div>
     <section class="panel" id="tallyBox" hidden></section>
+      <div id="growBox"></div>
       <div id="taleBox"></div>
       <div id="askBox"></div>
       <div><p class="eyebrow" style="margin-bottom:.4rem">At the fire</p><div class="fire" id="fire"></div></div>
       <div class="hud-stores" id="hudStores"></div>
       <div id="missing"></div>
-      <div><button class="quiet" data-open="plans">Everything the camp means to build</button></div>
+      <div id="plansRow"><button class="quiet" data-open="plans">Everything the camp means to build</button></div>
       <p class="small muted">Slide the picture. Tap a building or a place to walk over to it.</p>
     </div>
   </div>
@@ -226,12 +232,14 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
     <section class="panel" id="glimPanel">
       <div class="thead"><i class="glim big" id="glimOrb"></i><div><h2>Your glim</h2><p class="small" id="glimLine"></p></div></div>
       <p class="small muted">Everyone here has a glim, a small light that has kept beside them since they were children. Yours came out of a Tallyman's cage and stayed. A glim lives on its person's walking: every step you take keeps it bright, even the ones outside a task. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
+      <div id="stepBox" style="display:flex;flex-direction:column;gap:.5rem">
       <label for="stepInput">Today's steps</label>
       <div class="row">
         <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400">
         <button id="stepBtn">Log steps</button>
       </div>
       <p class="small num" id="stepLine"></p>
+      </div>
       <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
       <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem">
         <h3>Ask your glim</h3>
@@ -325,6 +333,17 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="gut screen sheet" data-sheet="phone" hidden><button class="quiet backbtn" data-back>Back</button>
     <div><p class="eyebrow">Your phone</p><p class="say" style="margin-top:.4rem">It died the night you reached Hollow Ash. Nobody here knows what it is. Until something charges it, this is where the things from outside the story are kept.</p></div>
     <section class="panel">
+      <h2>Who you are</h2>
+      <p class="small muted">What the camp calls you once you have earned it, and how they speak of you.</p>
+      <label for="nameSet">Your name</label>
+      <div class="row"><input class="grow" style="flex-basis:9rem" type="text" id="nameSet" maxlength="20" autocomplete="given-name" autocapitalize="words"><button id="nameSave">Save</button></div>
+      <label for="pronSel">They speak of you as</label>
+      <select id="pronSel"><option value="he">he</option><option value="she">she</option><option value="they">they</option></select>
+      <p class="small muted">Your face</p>
+      <div class="looks six" id="lookSet"></div>
+      <p class="small" id="whoLine" aria-live="polite"></p>
+    </section>
+    <section class="panel">
       <h2>Villager voices</h2>
       <p class="small" id="aiStatus"></p>
       <div id="keyBox" style="display:flex;flex-direction:column;gap:.6rem">
@@ -353,6 +372,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <button class="quiet" id="unitBtn"></button>
       <button class="quiet" id="moveHome">Move home base</button>
       <button class="quiet" id="resetBtn">Start the story over</button>
+      <button class="quiet" id="replayBtn">Play the opening again in practice mode</button>
     </section>
     <div id="privJournal"></div>
     <p class="small muted">Your home location and progress are saved only in this browser on this phone. Destinations come from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors and are not checked by anyone. Use your own judgment about where it is safe and allowed to walk, and skip any place that isn't.</p>
@@ -398,6 +418,7 @@ const PEOPLE = {
     ['Tight weave, double strap. It will outlast both of us.', 'Bring me your strange ideas from wherever you are from. I like them.']]}
 };
 const TASKS = {
+  firstwood:{g:'maren', t:'Wood for tonight\'s fire', d:'Maren points at the tree line. The fire burns all night here, every night, and it will not feed itself.', res:'wood', km:0.8, tr:1},
   water:   {g:'maren',  t:'Fill the water skins', d:'The skins are empty and the spring is not close. Maren does not ask twice.', res:'water', km:0.8, tr:1},
   softfood:{g:'isla',   t:'Something soft for Wren', d:'Sorrel and wild onion from the meadow. Wren will not take anything else.', res:'food', km:0.8, tr:1},
   race:    {g:'pip',    t:'Race Pip to the far field', d:'Pip says nobody your size makes it there and back without stopping. Prove a ten-year-old wrong.', res:'food', km:0.8, tr:1, battle:'dare'},
@@ -576,7 +597,8 @@ let practice = store.get('lwb-mode') === 'practice';
 let units = store.get('lwb-units') || ((navigator.language || '').toLowerCase() === 'en-us' ? 'mi' : 'km');
 const saveKey = () => practice ? 'lwb-save-practice' : 'lwb-save';
 const today = () => new Date().toLocaleDateString('en-CA');
-const blank = () => ({intro:false, home:null, first:today(), seen:today(),
+const freshStart = () => ({step:0, met:{maren:1, pip:1}, got:{wood:1}, day:'', news:[], climb:null});
+const blank = () => ({intro:false, home:null, first:today(), seen:today(), start:freshStart(),
   trust:{maren:0, tobiah:0, isla:0, dack:0, pip:1, oona:0},
   stock:{wood:4, water:6, food:6, stone:0, fiber:0, herbs:1}, built:{}, fixed:{}, v:2,
   board:null, offer:null, mission:null, last:null, fever:null, hungry:false,
@@ -587,8 +609,28 @@ function migrate(j){
   const old = j.built || {}, n = ['ring', 'leanto', 'cistern', 'smoke', 'wall'].filter(k => old[k]).length;
   j.built = old.loom ? {loom:true} : {}; STAGED.slice(0, n).forEach(b => j.built[b.k] = true); j.v = 2; return j;
 }
-function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return migrate(Object.assign(blank(), j, {v:j.v || 1})); } catch {} return blank(); }
+// A game begun with the story-led opening carries S.start: who has been met and what has been shown so far.
+// A save from before that opening has none. It has already met everyone, so it gets null and plays exactly as it did.
+function adopt(j){ const s = Object.assign(blank(), j, {v:j.v || 1}); if (!j.start) s.start = j.intro ? null : freshStart(); return migrate(s); }
+function load(){ try { const j = JSON.parse(store.get(saveKey())); if (j) return adopt(j); } catch {} return blank(); }
 let S = load();
+const met = k => !S.start || !!S.start.met[k];
+const has = f => !S.start || !!S.start.got[f];
+// The six people a new player can be. The first is the hero the game began with. Each has their own build.
+const LOOKS = [
+  {k:'a', pic:'hero',   pron:'he',  build:'big',    alt:'A big man with untidy brown hair and stubble'},
+  {k:'b', pic:'hero-b', pron:'she', build:'slight', alt:'A tall, slim woman with short curly hair and round glasses'},
+  {k:'c', pic:'hero-c', pron:'she', build:'mid',    alt:'A sturdy woman with red hair in a loose bun and freckles'},
+  {k:'d', pic:'hero-d', pron:'he',  build:'slight', alt:'A lean older man with a grey beard'},
+  {k:'e', pic:'hero-e', pron:'she', build:'big',    alt:'A heavyset woman with a straight black bob'},
+  {k:'f', pic:'hero-f', pron:'he',  build:'mid',    alt:'A young man with dark curly hair and a moustache'}
+];
+const look = () => LOOKS.find(l => l.k === S.look) || LOOKS[0];
+const PRON = {he:['he', 'him', 'his', 'man'], she:['she', 'her', 'her', 'woman'], they:['they', 'them', 'their', 'person']};
+const pron = () => PRON[S.pron] || PRON[look().pron];
+const myName = () => S.name || 'Stranger';
+const CLIMB = {out:200, pulse:40};
+const climbing = () => !!(S.start && !S.intro && S.start.climb && ['find', 'out', 'back'].includes(S.start.climb.phase));
 const save = () => store.set(saveKey(), JSON.stringify(S));
 
 /* ---------- geo maths ---------- */
@@ -682,13 +724,13 @@ const lostList = () => Object.keys(lost());
 const names = l => l.map(k => PEOPLE[k].name).join(' and ');
 const neglect = () => S.neglect || (S.neglect = {lastHelp:today(), stage:0, restUntil:'', rests:2});
 const resting = () => neglect().restUntil >= today();
-const fireLit = () => S.stock.wood >= FIRE.night || resting() || fullMoon(today());
+const fireLit = () => !has('fire') || S.stock.wood >= FIRE.night || resting() || fullMoon(today());
 /* Who the Unlit lead away: whoever you have had most to do with. Talking, visiting and carrying for someone all count. */
 const near = () => S.near || (S.near = {});
 function nearer(k, n){ if (PEOPLE[k]) near()[k] = (near()[k] || 0) + n; }
 function closest(){
   const arc = S.fever && !S.fever.done && !S.fever.failed;
-  const ok = Object.keys(PEOPLE).filter(k => !taken()[k] && !(k === 'tobiah' && (arc || (S.fever && S.fever.failed))));
+  const ok = Object.keys(PEOPLE).filter(k => met(k) && !taken()[k] && !(k === 'tobiah' && (arc || (S.fever && S.fever.failed))));
   return ok.sort((a, b) => (near()[b] || 0) - (near()[a] || 0) || S.trust[b] - S.trust[a])[0] || '';
 }
 const boss = () => taken().maren ? 'Isla' : 'Maren';
@@ -744,21 +786,22 @@ function campState(){
 /* How each villager is, and why. Every reason is something the game already knows, with a weight; the mood is their sum. */
 function reasonsFor(k){
   const out = [], add = (n, t) => { if (t) out.push({n, t}); };
+  if (has('build')){
   REPAIRS.filter(r => r.who === k).forEach(r => S.fixed[r.k] ? add(1, r.good) : add(-2, r.hurt));
   const nb = nextBuild(); if (nb && nb.who === k && !S.built[nb.k]) add(-1, nb.hurt);
-  BUILDS.filter(b => b.side && b.who === k && !S.built[b.k]).forEach(b => add(-1, b.hurt));
+  BUILDS.filter(b => b.side && b.who === k && !S.built[b.k]).forEach(b => add(-1, b.hurt)); }
   const made = BUILDS.filter(b => b.who === k && S.built[b.k]).pop(); if (made) add(1, made.good);
   const arc = S.fever;
   if (arc && !arc.done && !arc.failed){ if (k === 'isla') add(-3, "Wren's fever has not broken."); if (k === 'tobiah') add(-2, 'Wren needs feverbark and he cannot make the walk for it.'); }
   if (arc && arc.done && k === 'isla') add(2, 'Wren is well. You fetched the feverbark.');
   if (arc && arc.failed){ if (k === 'isla') add(-2, 'You did not go for the feverbark when Wren needed it.'); if (k === 'tobiah') add(-3, 'He made the walk himself and will not walk again.'); }
   if (S.hungry) add(-2, 'The stores ran dry and everyone went short.');
-  else if (k === 'maren'){ const n = needs(); ['water', 'food'].filter(r => n[r] > 0 && S.stock[r] < n[r] * 2).forEach(r => add(-1, 'There is ' + RES[r].toLowerCase() + ' for ' + (S.stock[r] < n[r] ? 'less than a day.' : 'one more day.'))); }
+  else if (k === 'maren'){ const n = needs(); ['water', 'food'].filter(r => has(r) && n[r] > 0 && S.stock[r] < n[r] * 2).forEach(r => add(-1, 'There is ' + RES[r].toLowerCase() + ' for ' + (S.stock[r] < n[r] ? 'less than a day.' : 'one more day.'))); }
   const tk = takenList().filter(o => o !== k), lo = lostList().filter(o => o !== k), N = neglect();
   if (tk.length) add(-2, 'The Tallymen hold ' + names(tk) + '.');
   if (lo.length) add(-2, names(lo) + ' was led away by the Unlit.');
   if (N.stage >= 1) add(k === 'tobiah' || k === 'maren' ? -2 : -1, N.stage >= 2 ? 'The fire died before dawn and there are marks on the door.' : 'Something stood at the edge of the firelight last night.');
-  else if (!fireLit() && (k === 'tobiah' || k === 'maren')) add(-1, 'There is not wood enough to keep the fire through tonight.');
+  else if (has('fire') && !fireLit() && (k === 'tobiah' || k === 'maren')) add(-1, 'There is not wood enough to keep the fire through tonight.');
   if (N.lastHelp === today() && S.stats.tasks) add(1, 'You carried for the camp today.');
   if (k === 'tobiah' && roundCount(roundsToday()) >= ROUND.bonusAt) add(1, 'You walked your rounds today without being asked.');
   if (k === 'pip') add(-1, 'He lost his glim when the river town burned.');
@@ -773,7 +816,7 @@ function moodOf(k){
 }
 // The camp's mood is the average of the people in it, and its line names whoever is worst off.
 function campMood(){
-  const here = Object.keys(PEOPLE).filter(k => !taken()[k]).map(k => [k, moodOf(k)]).sort((a, b) => a[1].n - b[1].n);
+  const here = Object.keys(PEOPLE).filter(k => met(k) && !taken()[k]).map(k => [k, moodOf(k)]).sort((a, b) => a[1].n - b[1].n);
   if (!here.length) return {word:'empty', tone:'bad', line:'There is nobody left at the fire.'};
   const n = Math.round(here.reduce((a, h) => a + h[1].n, 0) / here.length), [wk, w] = here[0], neg = w.why.find(r => r.n < 0);
   return {word:moodWord(n), tone:n < 0 ? 'bad' : n > 0 ? 'good' : '', line:'Hollow Ash is ' + moodWord(n) + '.' + (neg ? ' ' + PEOPLE[wk].name + ' is ' + w.word + '. ' + neg.t : ' Nobody at the fire is going without tonight.')};
@@ -798,9 +841,9 @@ function tally(){
   if (tasks > 0) rows.push(n(tasks, 'task', 'tasks') + ' carried home, ' + fmtDist(Math.max(0, S.stats.meters - d.meters)) + ' on foot.');
   if (wins > 0 || reps > 0) rows.push((wins > 0 ? n(wins, 'fight', 'fights') + ' won' : 'No fights won') + (reps > 0 ? ', ' + n(reps, 'rep', 'reps') + ' done.' : '.'));
   if (rounds) rows.push(n(rounds, 'round', 'rounds') + ' of the camp walked for Tobiah.');
-  const up = Object.keys(RES).filter(k => S.stock[k] > d.stock[k]).map(k => '+' + (S.stock[k] - d.stock[k]) + ' ' + RES[k].toLowerCase());
+  const up = Object.keys(RES).filter(k => has(k) && S.stock[k] > d.stock[k]).map(k => '+' + (S.stock[k] - d.stock[k]) + ' ' + RES[k].toLowerCase());
   if (up.length) rows.push('Into the stores: ' + up.join(', ') + '.');
-  const quiet = !rows.length, here = Object.keys(PEOPLE).filter(k => !taken()[k] && k in d.mood);
+  const quiet = !rows.length, here = Object.keys(PEOPLE).filter(k => met(k) && !taken()[k] && k in d.mood);
   const better = here.filter(k => moodOf(k).n > d.mood[k]), worse = here.filter(k => moodOf(k).n < d.mood[k]);
   const list = l => l.length === here.length && l.length > 2 ? 'Everyone at the fire' : l.map(k => PEOPLE[k].name).join(', ').replace(/, ([^,]*)$/, ' and $1');
   if (better.length) rows.push(list(better) + (better.length > 1 && better.length < here.length || better.length === 2 ? ' are' : ' is') + ' easier than this morning.');
@@ -826,9 +869,41 @@ function takeRest(){
   note('You told ' + boss() + ' you needed to rest. She looked at you for a while, then nodded. "Two days. We will keep the fire. Then I need you back."');
   save(); render();
 }
+// In a growing game a task is on offer only once its villager has been met and what it brings home has been shown.
+const allowed = id => { const T = TASKS[id]; return !S.start || (met(T.g) && has(T.res) && (id !== 'race' || has('steps')) && (T.battle !== 'foe' || has('fights'))); };
 function makeBoard(t){
   const h = hash(t + S.first);
-  S.board = {date:t, ids:POOLS.map((p, i) => { const ok = p.filter(id => !taken()[TASKS[id].g]), q = ok.length ? ok : p; return q[(h >>> (i * 5)) % q.length]; }), done:{}};
+  const ids = POOLS.map((p, i) => { const fit = p.filter(allowed), ok = fit.filter(id => !taken()[TASKS[id].g]), q = ok.length ? ok : fit; return q.length ? q[(h >>> (i * 5)) % q.length] : ''; }).filter(Boolean);
+  const w = S.start && S.start.want;   // whoever arrived today has their own job on the board
+  if (w && w.d === t && TASKS[w.id] && allowed(w.id) && !ids.includes(w.id)){ const pool = POOLS.find(q => q.includes(w.id)) || []; ids.splice(0, ids.length, ...ids.filter(id => !pool.includes(id)), w.id); }
+  if (S.start && !ids.some(id => TASKS[id].res === 'wood') && !met('dack')) ids.unshift('firstwood');   // until Dack hands out the wood jobs, Maren does
+  S.board = {date:t, ids, done:{}};
+}
+/* The growing game. One arrival at a time: a person turns up because they need something, and what they look after comes
+   with them. Arrivals are earned by walks finished, and there is never more than one in a day. */
+const GROW = [
+  {k:'tobiah', task:'bark', at:1, who:'tobiah', meet:['tobiah'], get:['fire', 'herbs'], h:'An old man moves his stick so you can sit',
+   t:'You put the wood down by the fire and an old man moved his stick so you could sit. "Tobiah. I was a boy in this valley, before it emptied. That wood you carried is the only wall this camp has. Sit, and I will tell you what it keeps out." He told you. Then he looked at his knee and said there were roots he could no longer walk to.'},
+  {k:'steps', task:'race', at:2, who:'pip', get:['steps', 'food'], h:'Pip has cut a fresh stick',
+   t:'Pip has cut himself a fresh stick and sat down next to you with it. "I am going to notch your steps. Your glim knows how many. You tell me, I cut it." Then, because he is ten: "And I bet you cannot beat me to the far field."'},
+  {k:'dack', task:'firewood', at:3, who:'dack', meet:['dack'], get:['fights'], h:'The hunter drops a game bag at your feet',
+   t:'The hunter who wanted you gone on the first night dropped an empty game bag at your feet. "Dack. You eat more than you carry. I can count." It is the most anyone but Maren and the boy has said to you. He has work for you, and none of it is close.'},
+  {k:'isla', task:'water', at:4, who:'isla', meet:['isla'], get:['water'], h:'The crying in the longhouse has a name',
+   t:'The crying you have heard from the longhouse every night has a name: Wren. Her mother came out with the empty water skins and put them in Maren\'s hands, and Maren put them in yours. "Isla," the mother said, without quite looking at you. "I do not know you. But she needs water, and you are the one who walks."'},
+  {k:'oona', task:'reeds', at:5, who:'oona', meet:['oona'], get:['fiber'], h:'Someone has been watching how you carry',
+   t:'A woman has been watching you carry things home in your arms for days, and today she could not stand it any longer. "Oona. Weaver. You carry like someone holding eggs. Bring me reeds, and a loom to work them on, and I will fix that."'},
+  {k:'build', task:'stone', at:6, who:'maren', get:['build', 'stone'], h:'Maren shows you what is broken',
+   t:'It was a cold night to sleep outside. In the morning Maren walked you through the longhouse and showed you everything in it that is broken, and who it hurts. Then she walked you round the yard and did the same. "You wanted to know what we need. All of it."'}
+];
+const ROUNDS_NEWS = {k:'rounds', who:'tobiah', h:'Tobiah has a rule for you',
+  t:'Tobiah took what you brought, and then watched how you sat down. "You sit like someone who means to stay sat. I sat out one winter with this knee and it never came right. My rule for you: never a whole hour. Come and see me about it."'};
+function reboard(){ const old = S.board; makeBoard(today()); if (old && old.date === S.board.date) S.board.ids.forEach(id => { if (old.done[id]) S.board.done[id] = true; }); }
+function arriveNews(g){ const G = S.start; G.got['s:' + g.k] = 1; (g.meet || []).forEach(k => G.met[k] = 1); (g.get || []).forEach(k => G.got[k] = 1); if (g.task) G.want = {id:g.task, d:today()}; G.news.push(g.k); note(g.t); }
+function grow(){
+  const G = S.start, t = today(); if (!G || !S.intro || !S.home) return;
+  const next = GROW.find(g => !G.got['s:' + g.k]);
+  if (!next || S.stats.tasks < next.at || G.day === t) return;
+  G.day = t; arriveNews(next); reboard();
 }
 function newDay(){
   const t = today(); syncFavour(); favourNight();
@@ -842,10 +917,10 @@ function newDay(){
       const night = addDays(t, i - days), free = neglect().restUntil >= night || fullMoon(night);
       let lit = true;
       for (const k in n){
-        if (k === 'wood' && free) continue;
+        if ((k === 'wood' && free) || !has(k === 'wood' ? 'fire' : k)) continue;
         S.stock[k] -= n[k]; if (S.stock[k] < 0){ S.stock[k] = 0; if (k === 'wood') lit = false; else dry = true; }
       }
-      if (S.home) fireNight(lit, t);
+      if (S.home && has('fire')) fireNight(lit, t);
     }
     if (dry && !S.hungry){ note('The stores ran dry overnight. Nobody said your name, but ' + (taken().dack ? 'Maren' : 'Dack') + ' looked at you when the pot came up empty.'); addTrust(taken().dack ? 'maren' : 'dack', -1); }
     S.hungry = dry; S.seen = t; S.last = null;
@@ -857,16 +932,17 @@ function newDay(){
       note('You did not go. Tobiah made the walk to Low Fennick himself and came back on a litter. Wren will live. He will not walk again, and Isla does not look at you.');
     }
   }
-  if (S.home && !S.valleyTold){
+  grow();
+  if (S.home && !S.valleyTold && met('tobiah')){
     S.valleyTold = t;
     note('Tobiah told it at the fire, because you asked why nobody else lives up here. He was a boy in this valley. It emptied in one winter and the river towns have called it forbidden ever since. That is why he led everyone here: the Tallymen will not follow. What emptied it he calls the Unlit. They were old when the empire cut its first stone, and they are not people, though in bad light they are shaped a little like them. They stand at the edge of any light and will not step into it. They will not go into a house. Under a full moon you can walk anywhere. So the fire burns all night, every night, and nobody steps into the shadows.');
   }
-  if (S.home && !S.glimTold){
+  if (S.home && !S.glimTold && met('tobiah') && (!S.start || S.valleyTold !== t)){
     S.glimTold = t;
     note('The small light that has kept at your shoulder since the road has a name. Tobiah calls it a glim. Everyone here has had one since they were children, and the Tallymen take them as their share, by the cageful. You broke a cage when you landed and this one stayed. It lives on your walking: sit still and it sinks to a coal, walk and it burns. Pip has none. His went out when the river town burned. Tobiah thinks that is why the Unlit keep coming to look at him. They have no light of their own, and they take anything without one for theirs.');
   }
   if (!S.board || S.board.date !== t) makeBoard(t);
-  if (!S.fever && standing() >= 5 && !taken().tobiah){
+  if (!S.fever && standing() >= 5 && !taken().tobiah && met('tobiah') && met('isla')){
     S.fever = {start:t, days:3, done:false, failed:false};
     note('Wren has a fever that will not break. Tobiah says feverbark would do it, and the nearest is in Low Fennick. He looked at his knee, then at you.');
   }
@@ -946,13 +1022,13 @@ const gpsStale = () => !pos || Date.now() - lastFixAt > 20000;
 // iPhones can ignore a location request that was not started by a tap, and phones drop the feed when the
 // screen locks. So: any tap while there is no fresh fix asks again, and a timer keeps polling in between.
 function kickGPS(){
-  if (practice || geoBlocked || !S.intro || !gpsStale() || Date.now() - lastKick < 4000) return;
+  if (practice || geoBlocked || !(S.intro || climbing()) || !gpsStale() || Date.now() - lastKick < 4000) return;
   lastKick = Date.now(); restartGPS();
 }
 document.addEventListener('click', kickGPS, true);
 setInterval(() => { if (wantHome && !S.home) tick(); }, 2000);
 setInterval(() => {
-  if (practice || document.hidden || geoBlocked || watchId === null || !(S.mission || wantHome)) return;
+  if (practice || document.hidden || geoBlocked || watchId === null || !(S.mission || wantHome || climbing())) return;
   if (gpsStale()) gpsPoll(gpsPolls % 2 === 1);
   const b = $('gpsRetry'); if (b) b.hidden = !gpsStale() || Date.now() - gpsSince < 6000;
   const d = $('gpsDiag'); if (d) d.textContent = gpsStale() && Date.now() - gpsSince > 6000 ? gpsDiag() : '';
@@ -962,6 +1038,7 @@ function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watc
 function crumb(m, fix){ if (!Array.isArray(m.trail)) m.trail = []; if (m.lastFix && dist(m.lastFix, fix) > 3) course = bearing(m.lastFix, fix); m.trail.push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
 function onFix(fix){
   pos = fix;
+  if (climbing()){ climbFix(fix); return; }
   if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 6000 && fix.acc <= 150))){
     S.home = {lat:fix.lat, lng:fix.lng}; S.offer = null; wantHome = 0; newDay(); render(); return;
   }
@@ -992,7 +1069,7 @@ function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); }
    allowed to send notifications, puts one on the phone too. */
 let actx = null;
 function unlockSound(){ try { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; actx = actx || new A(); if (actx.state !== 'running') actx.resume(); } catch {} }
-document.addEventListener('click', () => { if (S.mission || S.offer) unlockSound(); }, true);
+document.addEventListener('click', () => { if (S.mission || S.offer || !S.intro) unlockSound(); }, true);
 function chime(notes){
   try {
     unlockSound(); if (!actx) return;
@@ -1077,7 +1154,7 @@ function showArrive(){
 }
 let wake = null;
 async function keepAwake(){ try { wake = await navigator.wakeLock.request('screen'); } catch {} }
-document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); if (S.home && !geoBlocked) restartGPS(); wantRoute(); render(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission || climbing()) keepAwake(); if ((S.home || climbing()) && !geoBlocked) restartGPS(); wantRoute(); render(); } });
 
 /* ---------- destinations: real parks when the map service answers ---------- */
 let tried = [], scouting = false;
@@ -1328,12 +1405,13 @@ function unload(){
   { const N = neglect(); N.lastHelp = today(); N.stage = 0; N.dark = 0; }
   const steps = Math.round(m.meters / 0.78);
   S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
+  if (S.start && T.g === 'tobiah' && !S.start.got.rounds){ S.start.got.rounds = 1; S.start.news.push('rounds'); note(ROUNDS_NEWS.t); }
   S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag, item:got ? got.k : null};
   if (S.stats.tasks % 5 === 0 && neglect().rests < 3 + (perks().rest || 0)){ neglect().rests++; note(boss() + ' says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
   S.mission = null;
   if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
   if (gear() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
-  if (rankIdx() !== before.rank) note('Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
+  if (rankIdx() !== before.rank) note(S.name && before.rank === 0 ? 'Somebody called you ' + S.name + ' instead of Stranger, and nobody corrected them. ' + RANKS[rankIdx()][1] + ', they are saying too.' : 'Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
   if (level() !== before.lvl) note('Something has changed in you. Level ' + level() + '. You have a point to spend on the You screen.');
   if (S.stats.tasks === 1) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
   newDay(); buzz(); storyTurn();
@@ -1574,7 +1652,20 @@ async function askAI(rules, turns, wantJson, story){
   if (a < 0 || b <= a) throw {code:'upstream_error'};
   return JSON.parse(text.slice(a, b + 1));
 }
-function worldBrief(){
+// What the voices need to know about this one player: the name, how to speak of them, and who they have not met yet.
+function whoBrief(){
+  const P = pron(), out = [];
+  if (S.name) out.push(`The Stranger's own name is ${S.name}. Pip uses it. The others ${rankIdx() > 0 ? 'have started to use it too' : 'still say "Stranger" and will not use the name until it has been earned'}.`);
+  if (P[0] !== 'he') out.push(`The Stranger is a ${P[3]}: wherever this brief says he, him or his of the Stranger, read ${P[0]}, ${P[1]} and ${P[2]}, and always write ${P[0]}, ${P[1]} and ${P[2]}.`);
+  if (S.start){
+    const un = Object.keys(PEOPLE).filter(k => !met(k));
+    if (un.length) out.push(`The Stranger is new here and has so far only properly met ${names(Object.keys(PEOPLE).filter(met))}. ${names(un)} ${un.length > 1 ? 'keep' : 'keeps'} to the far side of the fire and ${un.length > 1 ? 'have' : 'has'} not spoken to the Stranger yet: do not bring them into a scene, quote them, or have anyone introduce them. The game introduces people in its own time.`);
+    if (!has('fire')) out.push('Nobody has explained the night fire or the Unlit to the Stranger yet. Leave that to Tobiah: say nothing of it.');
+  }
+  return out.length ? '\n' + out.join(' ') : '';
+}
+function worldBrief(){ return worldFacts() + whoBrief(); }
+function worldFacts(){
   const arc = S.fever && !S.fever.done && !S.fever.failed ? `The infant Wren has a dangerous fever. Feverbark from the village of Low Fennick would cure it, and ${feverLeft()} day(s) remain.` : S.fever && S.fever.failed ? 'The Stranger failed to fetch feverbark in time. Tobiah made the walk himself and can no longer walk at all. Wren lived.' : S.fever && S.fever.done ? 'The Stranger fetched the feverbark that broke the infant Wren\'s fever.' : '';
   return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They escaped into what the river towns call the forbidden valley and camp at a ruined waystation there called Hollow Ash: one longhouse, a fire, few stores. The Tallymen hold the crossings and commons at the valley mouth and take a share from every settlement, but they will not come into the valley itself. The valley has been deserted for a lifetime because of the Unlit: spirits that come down at night. They stand at the edge of any light and will not step into it, they will not go inside a house, and under a full moon it is safe to walk anywhere. So far they only seem curious, but people who step into the shadows at night are led away and not seen again, so everyone stays in the light. The camp keeps a fire burning all night, every night, which eats a great deal of wood. Tobiah lived in this valley as a boy before it emptied; he led the others here and remembers some of the old tricks for keeping the Unlit off, the all-night fire first among them. He does not know everything and says so. The Unlit are ancient, far older than the old empire or the Tallymen, and not human, though shaped a little like people in bad light. They have no light of their own. Tobiah believes they are drawn to Pip because he has no glim, and take anything without a light for one of theirs. A glim is too small a light to hold them off; a fire is not. Nobody knows more than this about what the Unlit are.
 The player is "the Stranger", who fell out of thin air from another world (ours), out of shape and wearing Crocs, on top of one of two Tallymen who had caught Maren and Pip on the valley road. Maren took that man's cloak for him and gave him a rope, a belt knife and a waterskin, and they escaped up to Hollow Ash; Everyone in this world has a glim: a small living light that has kept beside them since childhood and lives on its person's walking, burning brighter the more they walk. The Tallymen take glims as their share and carry them off in cages. The Stranger broke such a cage when he fell, the glims scattered, and one stayed with him; it is ${glim().word} today after ${glim().n.toLocaleString()} steps. Pip lost his own glim when the river town burned and watches the Stranger's closely. He carries a dead phone, a house key and a TV remote from his world. Maren has told him the broken arch at Hollow Ash is the door his kind come through, long dead, and the only way he could ever be sent home. He is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
@@ -1661,10 +1752,10 @@ function favourKept(){
   taleLog('Did what ' + PEOPLE[f.who].name + ' asked of him: ' + f.title + '.');
   note('You did what ' + PEOPLE[f.who].name + ' asked of you. "' + f.title + '." It was a small thing, and ' + PEOPLE[f.who].name + ' will remember it longer than the big ones.');
 }
-const canFavour = k => !!S.home && !favourOpen() && !favourBusy() && PEOPLE[k] && !taken()[k] && S.stats.tasks >= 1 && !(S.fever && !S.fever.done && !S.fever.failed) && !takenList().length;
+const canFavour = k => met(k) && !!S.home && !favourOpen() && !favourBusy() && PEOPLE[k] && !taken()[k] && S.stats.tasks >= 1 && !(S.fever && !S.fever.done && !S.fever.failed) && !takenList().length;
 // What the game knows about how this one player plays. Every line is a fact from the save; Claude adds nothing to it.
 function playerBrief(){
-  const T = tale(), here = Object.keys(PEOPLE).filter(k => !taken()[k]), N = neglect(), idle = dayDiff(N.lastHelp, today());
+  const T = tale(), here = Object.keys(PEOPLE).filter(k => met(k) && !taken()[k]), N = neglect(), idle = dayDiff(N.lastHelp, today());
   const by = here.slice().sort((a, b) => (near()[b] || 0) - (near()[a] || 0)), g = glim();
   const seen = by.filter(k => (near()[k] || 0) > 0), unseen = by.filter(k => !(near()[k] || 0));
   const f = favourOpen(), left = f ? dayDiff(today(), f.due) : 0;
@@ -1682,7 +1773,7 @@ His own thread of the story so far: ${T.thread || 'none yet'}
 Earlier turns, oldest first (do not repeat them): ${T.turns.slice().reverse().map(t => t.d + ' with ' + PEOPLE[t.who].name + ': ' + t.scene).join(' / ') || 'none yet'}`;
 }
 function turnRules(){
-  const here = Object.keys(PEOPLE).filter(k => !taken()[k]), may = here.filter(canFavour);
+  const here = Object.keys(PEOPLE).filter(k => met(k) && !taken()[k]), may = here.filter(canFavour);
   return worldBrief() + `
 
 You are the storyteller for one player. Everything above is fixed and is the same for every player. Your part is the small, personal layer on top of it: what happens at Hollow Ash today that could only happen to this Stranger, because of who he has spent time with, what he has said, what he promised, and what he has let slide. A player who talks to Pip every day and never to Dack should get a different story from one who does the opposite. Stakes matter here: people in this camp depend on him and should feel like it.
@@ -1696,9 +1787,9 @@ What a turn cannot do, because the game owns it: nobody arrives, leaves, dies, i
 // The referee. Anything that does not fit is dropped; a turn with no usable scene is no turn at all.
 function applyTurn(j){
   const T = tale(), who = clip(j && j.who, 12).toLowerCase(), scene = clip(j && j.scene, 420), line = clip(j && j.line, 220);
-  if (!PEOPLE[who] || taken()[who] || scene.length < 20) return false;
+  if (!PEOPLE[who] || !met(who) || taken()[who] || scene.length < 20) return false;
   const turn = {d:today(), who, scene, line};
-  if (j.move === 'favour' && canFavour(who) && RES[j.favour_res]){
+  if (j.move === 'favour' && canFavour(who) && RES[j.favour_res] && has(j.favour_res)){
     const far = j.favour_far === true && S.stats.tasks >= TALE.farTasks && !!PLACE_TINT[j.favour_res + '-far'];
     T.favour = {who, res:j.favour_res, far, title:clip(j.favour_title, 40) || RES[j.favour_res] + ' for ' + PEOPLE[who].name, ask:clip(j.favour_ask, 200) || PEOPLE[who].name + ' asked it of you, and of nobody else.', made:today(), due:addDays(today(), TALE.days + (far ? 1 : 0)), done:false};
     turn.favour = true; syncFavour();
@@ -1767,7 +1858,7 @@ function showTab(t){
   tab = OLD_TAB[t] || t;
   document.querySelectorAll('[data-tab]').forEach(e => e.hidden = !!sheet || e.dataset.tab !== tab);
   document.querySelectorAll('[data-sheet]').forEach(e => e.hidden = e.dataset.sheet !== sheet);
-  document.querySelectorAll('[data-own]').forEach(e => e.hidden = e.dataset.own !== openPerson || (!!taken()[openPerson] && !lost()[openPerson]));
+  document.querySelectorAll('[data-own]').forEach(e => e.hidden = e.dataset.own !== openPerson || (!!taken()[openPerson] && !lost()[openPerson]) || (e.dataset.own === 'tobiah' && !has('rounds')));
   document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-current', String(b.dataset.go === tab)));
   if (!sheet && tab === 'walk') requestAnimationFrame(drawRadar);
   if (sheet === 'map') requestAnimationFrame(drawWorld);
@@ -1792,22 +1883,133 @@ function asks(){
   S.board.ids.filter(id => !S.board.done[id]).forEach(id => out.push({who:TASKS[id].g, t:TASKS[id].t, sub:TASKS[id].d}));
   return out.filter(a => a.who && PEOPLE[a.who]);
 }
-let introStep = 0;
-const INTRO = [
-  {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into a cold hillside with a ruined arch on the far ridge',
-   html:'<p>You are on the couch with a bag of chips on your chest and the remote in your hand, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>'},
-  {img:'intro-fall', eye:'Somewhere else', alt:'You, falling out of thin air above an old stone road, where two men in grey are tying up a woman and holding a boy by the collar',
-   html:'<p>When it stops you are ten feet above an old stone road at dusk, and falling. Your phone lights up in your pocket. No signal.</p><p>Below you, two men in grey with notched sticks on their belts have caught a woman and a boy. One is knotting a rope round her wrists. The other carries a wicker cage full of small lights, crowded together like sparks in a jar. Only the boy is looking up.</p>'},
-  {img:'intro-landing', eye:'The landing', alt:'You, landed flat on one of the men in a cloud of dust and chips, while the woman knocks the other one down with her spear',
-   html:'<p>You land on the one with the rope. It is the most useful thing you have done all year, and you did it by accident. The cage goes over with him and splits. The lights pour out and scatter into the trees. One does not. It hangs in front of your face, the size of a thumbnail, and then settles at your shoulder.</p><p>The woman has the other one on the ground before he finishes turning round. Then she looks at you: the hoodie, the foam clogs, the remote still in your fist.</p>'},
-  {img:'intro-cloak', eye:'What they carried', alt:'You, pulling on a dead-grey cloak and staring at your phone, while the woman holds out a knife and a waterskin and the boy holds up a notched stick',
-   html:'<p><span class="say">"Take his cloak. Quick."</span> His boots are far too small for you. She looks at your clogs again and gives up. <span class="say">"Then you run in those."</span></p><p>She and the boy go through both men. You are handed the rope that was meant for their wrists, a belt knife and a half-full waterskin. The boy keeps one of the notched sticks. He has not taken his eyes off the light at your shoulder. <span class="say">"That is a glim,"</span> the woman says. <span class="say">"They took it off somebody. It seems to think it is yours now."</span> She has one too, tucked under her collar. The boy does not. Your phone says 4%. Down the valley, torches are coming.</p>'},
-  {img:'intro-climb', eye:'The climb', alt:'You, bent double on a steep mountain path at night, far behind the woman and the boy, with torches on the valley road below and a ruined arch on the ridge above',
-   html:'<p>It is the longest walk you have taken in years, uphill in the dark, by the light of your phone until she makes you cover it. You stop four times. She does not wait, but she does not lose you either.</p><p>You give the boy a piece of gum from your pocket. He says his name is Pip. <span class="say">"It gets brighter when you walk,"</span> he says, pointing at your shoulder. <span class="say">"Look."</span> He is right. By the top of the path it is the brightest thing on the mountain.</p>'},
-  {img:'intro-edge', eye:'Hollow Ash', alt:'You, in the stolen cloak by the campfire with a bowl, the others watching from across the flames, a ruined arch behind them',
-   html:'<p>At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"He fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>'}
-];
-const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
+/* ---------- the opening, for a new player ----------
+   Eight steps. Who you are is asked inside the story, one thing at a time: your face on the phone's lock screen as you fall,
+   your name when Pip asks for it on the climb. The climb itself is a real walk: out until the glim stops, then back to
+   where you started, which becomes the camp. */
+const START_STEPS = 8;
+const NAME_OK = /^[\p{L}][\p{L} '\-]{0,19}$/u;
+function climbStart(){
+  const G = S.start; unlockSound(); keepAwake();
+  G.climb = {phase:'find', t0:Date.now(), far:0, left:0, from:null}; save();
+  if (practice){ sim = {lat:44.98, lng:-93.27}; onFix({...sim, acc:5, t:Date.now(), sim:true}); return; }
+  geoError = ''; geoBlocked = false; startGPS(); render(); if (pos) onFix(pos);
+}
+function climbSkip(){ const G = S.start; G.skip = 1; G.climb = null; G.step = G.name ? 7 : 5; if (wake){ try { wake.release(); } catch {} wake = null; } save(); render(); window.scrollTo(0, 0); }
+function climbSim(){
+  const C = S.start.climb; if (!C || !C.from) return; if (!sim) sim = {...C.from};
+  if (C.phase === 'out') sim = project(sim, 20, 50); else { const d = dist(sim, C.from); sim = d <= 50 ? {...C.from} : project(sim, bearing(sim, C.from), 50); }
+  onFix({...sim, acc:5, t:Date.now(), sim:true});
+}
+function climbFix(fix){
+  const G = S.start, C = G.climb;
+  if (C.phase === 'find'){
+    if (fix.acc <= 40 || (Date.now() - C.t0 > 6000 && fix.acc <= 150)){ C.from = {lat:fix.lat, lng:fix.lng}; C.phase = 'out'; glimTone('step'); save(); render(); }
+    else climbTick();
+    return;
+  }
+  if (fix.acc > 100){ climbTick(); return; }
+  const d = dist(C.from, fix);
+  if (C.phase === 'out'){
+    if (d > C.far){ if (Math.floor(d / CLIMB.pulse) > Math.floor(C.far / CLIMB.pulse)) glimTone('step'); C.far = d; }
+    if (d >= CLIMB.out){
+      C.phase = 'half'; C.left = d; G.step = G.name ? 6 : 5; if (G.name) C.phase = 'back';
+      announce('Your glim has stopped', 'You are halfway up. Open the game.', [523, 659, 784]); save(); render(); window.scrollTo(0, 0); return;
+    }
+  } else if (C.phase === 'back'){
+    if (Math.floor(d / CLIMB.pulse) < Math.floor(C.left / CLIMB.pulse)) glimTone('step');
+    C.left = d;
+    if (d <= Math.max(ARRIVE_M, Math.min(fix.acc, 70))){
+      C.phase = 'done'; S.home = {...C.from}; S.stats.meters += CLIMB.out * 2; S.stats.steps += Math.round(CLIMB.out * 2 / 0.78); G.step = 7;
+      if (wake){ try { wake.release(); } catch {} wake = null; }
+      announce('Hollow Ash', 'You are at the top of the path. Open the game.', [523, 659, 784, 1047]); save(); render(); window.scrollTo(0, 0); return;
+    }
+  }
+  climbTick();
+}
+function climbTick(){
+  const G = S.start, C = G && G.climb; if (!C || !$('cBig')) return;
+  const out = C.phase !== 'back', done = out ? Math.min(1, C.far / CLIMB.out) : Math.max(0, 1 - C.left / CLIMB.out);
+  $('cOrb').style.setProperty('--b', C.phase === 'find' ? .05 : (.15 + .85 * done).toFixed(2)); $('cBar').style.width = Math.round(done * 100) + '%';
+  if (C.phase === 'find'){
+    $('cBig').textContent = '…';
+    $('cLine').textContent = geoError || (pos ? 'Your phone knows where you are to within ' + Math.round(pos.acc) + ' m. Stand still a moment while that sharpens. It is quicker outside.' : 'Stand still a moment. Tap anywhere if this does not clear in a few seconds.');
+  } else if (out){
+    $('cBig').textContent = fmtDist(Math.max(0, CLIMB.out - C.far));
+    $('cLine').textContent = 'until it stops. It keeps just ahead of you, so any way you can walk for a couple of minutes will do.';
+  } else {
+    $('cBig').textContent = fmtDist(C.left);
+    $('cLine').textContent = 'back to where you started. ' + (pos && C.left > 25 ? 'It leans ' + compass(bearing(pos, C.from)) + '.' : 'Nearly there.');
+  }
+  const g = $('gpsLine'); if (g) g.textContent = practice ? 'Practice mode: tap Walk to move.' : pos && pos.acc > 100 ? 'Your phone only knows where you are to within ' + Math.round(pos.acc) + ' m, which is too rough to count. It usually sharpens once you are outside and moving.' : pos ? 'Keep this screen open while you walk.' : '';
+}
+function startDone(){
+  const G = S.start; S.intro = true; G.climb = null; tab = 'camp';
+  note('They call the place Hollow Ash. They call you Stranger, all of them but Pip, who calls you ' + myName() + '. You have a place by the fire, a stolen cloak, a rope, a knife, a waterskin, a dead phone and a small light that will not leave your shoulder.');
+  if (S.home){ newDay(); if (practice){ sim = {...S.home}; pos = {...sim, acc:5, t:Date.now(), sim:true}; } }
+  save(); startGPS(); render(); window.scrollTo(0, 0);
+}
+function renderStart(el){
+  const G = S.start, L = look(), P = pron(), step = G.step, C = G.climb, cap = w => w[0].toUpperCase() + w.slice(1);
+  const dots = `<div class="introdots" aria-hidden="true">${Array.from({length:START_STEPS}, (_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>`;
+  const scene = (img, eye, alt, html, strip) => `${pic(img, 'scene' + (strip ? ' strip' : ''), alt)}<p class="eyebrow">${eye}</p><div class="story">${html}</div>`;
+  const next = (label, off) => `${dots}<button class="primary" id="begin" ${off ? 'disabled' : ''}>${label}</button>${step > 0 && step < 4 ? '<button id="introBack">Back</button>' : ''}`;
+  const pipSays = `<p><span class="say">"${esc(myName())},"</span> Pip says, trying it out. <span class="say">"It gets brighter when you walk. Look."</span> He is pointing at your shoulder, and he is right.</p>`;
+  const climbAlt = 'You, bent double on a steep mountain path at night, far behind the woman and the boy, with torches on the valley road below and a ruined arch on the ridge above';
+  const walking = C && ['find', 'out', 'back'].includes(C.phase);
+  let h = '';
+  if (step === 0) h = scene('couch', 'Before', 'You, on the couch, as the living room dissolves into a cold hillside with a ruined arch on the far ridge',
+    '<p>You are on the couch with a bag of chips on your chest and the remote in your hand, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>') + next('Next');
+  else if (step === 1) h = scene('intro-fall', 'Somewhere else', 'You, falling out of thin air above an old stone road, where two men in grey are tying up a woman and holding a boy by the collar',
+    '<p>When it stops you are ten feet above an old stone road at dusk, and falling. Your phone lights up in your pocket. No signal.</p><p>Below you, two men in grey with notched sticks on their belts have caught a woman and a boy. One is knotting a rope round her wrists. The other carries a wicker cage full of small lights, crowded together like sparks in a jar. Only the boy is looking up.</p><p>The phone turns over in the air beside you, lock screen up. For a moment the only thing you can see clearly is your own face on it.</p>')
+    + `<div class="panel"><p class="eyebrow">Your lock screen</p><p class="small" style="margin:.3rem 0 .6rem">Which of these is you?</p><div class="looks">${LOOKS.map(l => `<button class="bare${S.look === l.k ? ' on' : ''}" data-look="${l.k}" aria-pressed="${S.look === l.k}" aria-label="${l.alt}">${pic(l.pic, 'face', '')}</button>`).join('')}</div></div>`
+    + next(S.look ? 'That is me' : 'Pick the one that is you', !S.look);
+  else if (step === 2) h = scene('intro-landing', 'The landing', 'You, landed flat on one of the men in a cloud of dust and chips, while the woman knocks the other one down with her spear',
+    '<p>You land on the one with the rope. It is the most useful thing you have done all year, and you did it by accident. The cage goes over with him and splits. The lights pour out and scatter into the trees. One does not. It hangs in front of your face, the size of a thumbnail.</p>'
+    + (G.glim ? '<p>It pulses once under your finger, a sound you feel more than hear, and then it settles at your shoulder as if that had been decided a long time ago.</p><p>The woman has the other one on the ground before he finishes turning round. Then she looks at you: the hoodie, the foam clogs, the remote still in your fist.</p>' : ''))
+    + (G.glim ? '' : '<button class="bare glimtap" id="glimTap"><i class="glim big" style="--b:.6"></i><span>Reach out and touch it</span></button>') + next('Next', !G.glim);
+  else if (step === 3) h = scene('intro-cloak', 'What they carried', 'You, pulling on a dead-grey cloak and staring at your phone, while the woman holds out a knife and a waterskin and the boy holds up a notched stick',
+    `<p><span class="say">"Take his cloak. Quick."</span> ${L.build === 'big' ? 'It barely closes across your chest. His boots are far too small for you.' : L.build === 'slight' ? 'It hangs off you like a tent. His boots are far too big for you.' : 'It fits, near enough. His boots do not, by a size.'} She looks at your clogs again and gives up. <span class="say">"Then you run in those."</span></p><p>She and the boy go through both men. You are handed the rope that was meant for their wrists, a belt knife and a half-full waterskin. The boy keeps one of the notched sticks. He has not taken his eyes off the light at your shoulder. <span class="say">"That is a glim,"</span> the woman says. <span class="say">"They took it off somebody. It seems to think it is yours now."</span> She has one too, tucked under her collar. The boy does not. Your phone says 4%. Down the valley, torches are coming.</p>`) + next('Next');
+  else if (step === 4 && !walking) h = scene('intro-climb', 'The climb', climbAlt,
+    '<p>The woman points up the mountain, into the dark. <span class="say">"Up. Now. Before those torches find the road."</span></p><p>The glim lifts off your shoulder and drifts a little way ahead of you, the way a dog does when it knows you are coming.</p>')
+    + `<div class="panel"><h3>This part is real</h3><p class="small">Stand up, go outside and walk. Your glim goes ahead of you. About ${fmtDist(CLIMB.out)} from where you start, it stops. Then it leads you back. Five minutes in all.</p><p class="small">Where you start is where your camp will stand, so start from your own door if you can.</p>
+      ${practice ? '' : '<p class="small"><b>Your location stays on your phone.</b> The game only uses it to measure your walk. Your phone will ask to share it. Tap <b>Allow</b>.</p>' + PRIVACY}</div>
+      ${dots}<button class="primary" id="climbGo">Follow the glim</button><button id="introBack">Back</button><button class="quiet" id="climbSkip">I can't walk right now</button>`;
+  else if (step === 5) h = scene('intro-climb', 'Halfway up', climbAlt,
+    `<p>${G.skip ? 'It is the longest walk you have taken in years, uphill in the dark, by the light of your phone until she makes you cover it. You stop four times.' : 'Your glim has stopped, and so have you, with your hands on your knees. It is the longest walk you have taken in years.'} The woman does not wait, but she does not lose you either.</p><p>The boy waits with you. You give him a piece of gum from your pocket and he turns it over twice before he trusts it. <span class="say">"I am Pip,"</span> he says, chewing. <span class="say">"What do they call you?"</span></p>`)
+    + `<label for="nameIn">Your name</label><div class="row"><input type="text" class="grow" style="flex-basis:9rem" id="nameIn" maxlength="20" autocomplete="given-name" autocapitalize="words" value="${esc(S.name || '')}"><button class="primary" id="nameGo">Tell him</button></div><p class="small" id="nameErr" style="color:var(--warn)" aria-live="polite"></p>${dots}`;
+  else if (step === 4 || step === 6) h = `${pic('intro-climb', 'scene strip', climbAlt)}<p class="eyebrow">${step === 6 ? 'The rest of the climb' : 'The climb'}</p>
+    ${step === 6 ? '<div class="story">' + pipSays + '</div>' : ''}
+    <h2>${C.phase === 'find' ? 'Your glim is finding you' : C.phase === 'out' ? 'Follow your glim' : 'Your glim is leading you back'}</h2>
+    <div class="climb"><i class="glim big" id="cOrb"></i><div class="grow"><div class="big num" id="cBig">…</div><p class="muted" id="cLine"></p></div></div>
+    <div class="bar" role="img" aria-label="How far through this part of the climb you are"><i id="cBar" style="width:0"></i></div>
+    ${practice && C.phase !== 'find' ? '<button class="primary" id="climbSim">Walk 50 m</button>' : ''}
+    <p class="small muted" id="gpsLine"></p>
+    ${geoBlocked ? locHelp(true) : ''}
+    ${geoBlocked ? '<button class="primary" id="climbGo">Try again</button>' : ''}
+    ${dots}<button class="quiet" id="climbSkip">I can't walk right now</button>`;
+  else h = scene('intro-edge', 'Hollow Ash', 'You, in the stolen cloak by the campfire with a bowl, the others watching from across the flames, a ruined arch behind them',
+    `${G.skip ? pipSays : ''}<p>${G.skip ? '' : 'By the top of the path your glim is the brightest thing on the mountain. '}At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"${cap(P[0])} fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>`)
+    + (S.home ? '<p class="small muted">Your camp stands where you started that walk. If that is not where you sleep, you can move it later: open You, then Your phone.</p>' : '') + dots + '<button class="primary" id="begin">Take the offer</button>';
+  el.innerHTML = h;
+  const go = n => { G.step = n; save(); render(); window.scrollTo(0, 0); };
+  const pre = {0:'intro-fall', 1:'intro-landing', 2:'intro-cloak', 3:'intro-climb', 6:'intro-edge'}[step]; if (pre) new Image().src = 'art/' + pre + '.jpg';
+  if ($('begin')) $('begin').onclick = () => { if (step === 7) startDone(); else go(step + 1); };
+  if ($('introBack')) $('introBack').onclick = () => go(step - 1);
+  el.querySelectorAll('button[data-look]').forEach(b => b.onclick = () => { S.look = b.dataset.look; delete S.pron; save(); render(); });
+  if ($('glimTap')) $('glimTap').onclick = () => { glimTone('step'); G.glim = 1; save(); render(); };
+  if ($('climbGo')) $('climbGo').onclick = climbStart;
+  if ($('climbSkip')) $('climbSkip').onclick = climbSkip;
+  if ($('climbSim')) $('climbSim').onclick = climbSim;
+  if ($('nameGo')){
+    const tell = () => { const v = $('nameIn').value.trim().replace(/\s+/g, ' ');
+      if (!NAME_OK.test(v)){ $('nameErr').textContent = v ? 'Pip cannot get his mouth round that. Letters only, twenty at most.' : 'He is still waiting.'; return; }
+      S.name = v; if (C && C.phase === 'half') C.phase = 'back'; go(G.skip ? 7 : 6); };
+    $('nameGo').onclick = tell; $('nameIn').onkeydown = e => { if (e.key === 'Enter') tell(); };
+  }
+  climbTick();
+}
+const viewKey = () => !S.intro ? 'intro' + (S.start ? S.start.step + (S.start.climb ? S.start.climb.phase : '') : '') + geoBlocked : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
 const radarBox = cap => `<div class="mapwrap"><canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
   <div class="mapctl"><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button>${S.mission ? '<button id="faceBtn" aria-label="Turn the map to face the way I am facing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 19 21 12 17 5 21Z"/></svg></button>' : ''}</div></div>
   <div class="maprow"><p class="small muted grow">${cap}</p>${practice || !GMAPS_KEY ? '' : '<button class="mapicon" id="gmapBtn" aria-label="Check the route on Google Maps" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg></button>'}</div><div id="gmapSlot"></div>`;
@@ -1909,17 +2111,8 @@ function render(){
   if (!playing || S.mission) sheet = '';   // out on a walk there is only the walk
   showTab(!playing || S.mission ? 'walk' : tab);
   if (!S.intro){
-    const I = INTRO[introStep], last = introStep === INTRO.length - 1;
-    el.innerHTML = `${pic(I.img, 'scene', I.alt)}<p class="eyebrow">${I.eye}</p><div class="story">${I.html}</div>
-      <div class="introdots" aria-hidden="true">${INTRO.map((_, i) => `<i class="${i === introStep ? 'on' : ''}"></i>`).join('')}</div>
-      <button class="primary" id="begin">${last ? 'Take the offer' : 'Next'}</button>
-      ${introStep ? '<button id="introBack">Back</button>' : ''}`;
-    if (!last) new Image().src = 'art/' + INTRO[introStep + 1].img + '.jpg';
-    $('begin').onclick = () => {
-      if (!last){ introStep++; render(); window.scrollTo(0, 0); return; }
-      S.intro = true; note('They call the place Hollow Ash. They call you Stranger. You have a place by the fire, a stolen cloak, a rope, a knife, a waterskin and a dead phone.'); save(); startGPS(); render(); window.scrollTo(0, 0);
-    };
-    if (introStep) $('introBack').onclick = () => { introStep--; render(); window.scrollTo(0, 0); };
+    if (!S.start) S.start = freshStart();
+    renderStart(el);
   } else if (!S.home){
     el.innerHTML = `${villagePic('scene')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
       <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
@@ -2176,17 +2369,18 @@ function drawRadar(){
 const talkIdx = {};
 function renderCamp(){
   const r = rankIdx(), next = RANKS[r + 1];
+  document.querySelector('[data-go="walk"]').hidden = !has('walk'); $('plansRow').hidden = !has('build'); $('stepBox').hidden = !has('steps'); $('stepLink').hidden = !has('steps');
   const n0 = needs(), base = RANKS[r][0], CS = campState();
   $('hudDay').textContent = 'Day ' + (dayDiff(S.first, today()) + 1);
   $('hudRank').textContent = RANKS[r][1];
   $('hudCarry').textContent = 'Carry ' + carry();
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
-  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small>${n0[k] > 0 ? `<em>${Math.floor(S.stock[k] / n0[k]) === 1 ? '1 day' : Math.floor(S.stock[k] / n0[k]) + ' days'}</em>` : ''}</div>`).join('');
+  $('hudStores').innerHTML = Object.entries(RES).filter(([k]) => has(k)).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small>${n0[k] > 0 ? `<em>${Math.floor(S.stock[k] / n0[k]) === 1 ? '1 day' : Math.floor(S.stock[k] / n0[k]) + ' days'}</em>` : ''}</div>`).join('');
   { const sp = SPOTS.find(s => s.k === openSpot) || SPOTS[0], stage = villageStage(), box = $('spotBox');
     const face = who => pic('p-' + who, 'face sm');
     const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. ' + (lost()[who] ? 'The Unlit led ' + PEOPLE[who].name + ' away.' : 'The Tallymen have ' + PEOPLE[who].name + '.') : hurt}</span>`;
-    const jobs = spotJobs(sp.k).map(b => {
+    const jobs = (has('build') ? spotJobs(sp.k) : []).map(b => {
       if (S.built[b.k]) return `<li class="ok"><div class="thead">${face(b.who)}<div class="who"><h3>${b.name}</h3><span class="built">Built</span></div></div><p class="small">${b.good}</p><p class="cost">${b.perk}</p></li>`;
       const why = blocked(b), can = canPay(b.cost);
       return `<li><div class="thead">${face(b.who)}<div class="who"><h3>${b.name}</h3></div></div>
@@ -2194,7 +2388,9 @@ function renderCamp(){
         ${why ? `<p class="small muted">${why}</p>` : `<button data-b="${b.k}" ${can ? 'class="primary"' : 'disabled'}>${can ? 'Build it' : 'Not enough in the stores yet'}</button>`}</li>`;
     }).join('');
     let h = `<p class="eyebrow">You walk over to</p><h2>${sp.name}</h2>`;
-    if (sp.k === 'house'){
+    if (sp.k === 'house' && !has('build')){
+      h += `${pic('inside-0', 'scene', 'Inside the longhouse: cold, damp and in bad repair, with the survivors huddled in it')}<p class="small">This is where they sleep. Nobody has asked you inside. From the doorway it looks cold and wet, and somewhere at the back of it a baby is crying.</p>`;
+    } else if (sp.k === 'house'){
       const done = REPAIRS.filter(r => S.fixed[r.k]).length, nextR = REPAIRS.find(r => !S.fixed[r.k]);
       h += `${pic('inside-' + done, 'scene', done === REPAIRS.length ? 'Inside the longhouse, mended: a whole roof, closed shutters, a good fire and dry beds' : 'Inside the longhouse: cold, damp and in bad repair, with the survivors huddled in it')}
       <p class="small">${done === REPAIRS.length ? 'Roof, shutters, hearth and beds are all mended. Nobody in here is cold tonight.' : done ? done + ' of ' + REPAIRS.length + ' mended. The rest still hurts someone every night.' : 'This is where they sleep. Everything in it is broken, and someone suffers for each broken thing until it is mended.'}</p>
@@ -2229,14 +2425,15 @@ function renderCamp(){
         g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } }; });
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
-    $('sheet').innerHTML = `<div class="hero"><img src="art/hero.jpg" alt="You, in a grey hoodie with a blanket over one shoulder" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>Level ${lv}</h2>
+    const early = !!S.start && S.stats.tasks < 1, fold = early ? '<div hidden>' : '<div style="display:contents">';
+    $('sheet').innerHTML = `<div class="hero"><img src="art/${look().pic}.jpg" alt="You. ${look().alt}, in a grey hoodie with a stolen cloak over it" onerror="this.hidden=true"><div class="grow"><p class="eyebrow">${RANKS[r][1]}</p><h2>${S.name ? esc(S.name) + ', level ' + lv : 'Level ' + lv}</h2>
         <div class="bar" role="img" aria-label="${x - lo} of ${hi - lo} experience to level ${lv + 1}"><i style="width:${Math.round((x - lo) / (hi - lo) * 100)}%"></i></div><p class="small muted num">${x} XP. ${hi - x} more to level ${lv + 1}.</p></div></div>
-      <ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
-        <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul>
+      ${fold}<ul class="attrs">${ATTR.map(a => { const L = attrLvl(a), v = a.val(), nx = a.steps[L], pv = a.steps[L - 1]; return `<li><span class="small muted">${a.name}</span><br><b class="num">${L}</b>
+        <div class="bar"><i style="width:${nx == null ? 100 : Math.round((v - pv) / (nx - pv) * 100)}%"></i></div><span class="small muted num">${a.d}: ${a.fmt(v)}${nx == null ? '' : ', next at ' + a.fmt(nx)}</span></li>`; }).join('')}</ul></div>
       <dl class="status" style="margin-top:.9rem"><dt>Carries</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>Wears</dt><dd>${items().includes('boots') ? 'A hoodie, sweatpants, a Tallyman\'s cloak and a dead soldier\'s marching boots' : 'A hoodie, sweatpants, a Tallyman\'s cloak and foam clogs from another world'}</dd><dt>Sleeps</dt><dd>${sleep()}</dd><dt>Eats</dt><dd>${rations()}</dd></dl>
-      <p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Keep going back to the same places. Old tools and useful things turn up there, some for you and some for the camp.</p>'}
+      ${fold}<p class="eyebrow" style="margin-top:1rem">Things you have found</p>${items().length ? `<ul class="perks kit">${items().map(item).filter(Boolean).map(i => `<li><div><b>${esc(i.name)}</b> <span class="small muted">${i.who === 'you' ? 'In your kit' : 'Given to ' + PEOPLE[i.who].name}</span><div class="small">${esc(i.does)}</div></div></li>`).join('')}</ul><p class="small muted num">${items().length} of ${ITEMS.length} found.</p>` : '<p class="small muted">Nothing yet. Keep going back to the same places. Old tools and useful things turn up there, some for you and some for the camp.</p>'}
       <p class="eyebrow" style="margin-top:1rem">Upgrades</p><p class="small ${pts > 0 ? '' : 'muted'}">${pts > 0 ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'You earn one point each level. XP comes from tasks, distance, workouts, repairs and what you find.'}</p>
-      <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul>`;
+      <ul class="perks">${PERKS.map(k => { const n = perks()[k.k] || 0; return `<li><div><b>${k.name}</b> <span class="small muted num">${n} of ${k.max}</span><div class="small">${k.d}</div></div>${n >= k.max ? '<span class="built">Full</span>' : `<button data-perk="${k.k}" ${pts > 0 ? 'class="primary"' : 'disabled'}>Take</button>`}</li>`; }).join('')}</ul></div>`;
     $('sheet').querySelectorAll('button[data-perk]').forEach(btn => btn.onclick = () => {
       const k = PERKS.find(q => q.k === btn.dataset.perk), n = perks()[k.k] || 0; if (points() < 1 || n >= k.max) return;
       perks()[k.k] = n + 1; if (k.k === 'rest') neglect().rests++;
@@ -2248,7 +2445,7 @@ function renderCamp(){
   { const N = neglect();
     $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with ' + boss() + '\'s leave' : 'Tell ' + boss() + ' you need two rest days (' + N.rests + ' banked)'}</button>
       <p class="small muted">The fire has to burn all night, and it eats ${needs().wood} firewood doing it. Any walk you finish brings home enough for one night. Let it go dark and the Unlit come closer each night: first to the edge of the camp, then to the door, then they lead away whoever you are closest to. On rest days the camp keeps the fire for you, and you earn another rest for every five tasks.</p>`;
-    $('restBtn').onclick = takeRest; }
+    $('restBtn').onclick = takeRest; $('restBox').hidden = !has('fire'); }
   $('people').innerHTML = Object.entries(PEOPLE).filter(([k]) => k === openPerson).map(([k, p]) => {
     const t = S.trust[k], tier = t >= 7 ? 2 : t >= 3 ? 1 : 0, line = p.lines[tier][(talkIdx[k] || 0) % 2], open = aiOn() && openTalk === k, md = moodOf(k);
     if (taken()[k]) return `<li class="gone"><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3></div><span class="small muted">${p.role}</span></div></div><span class="say">${lost()[k] ? 'Led away by the Unlit, up the valley in the dark. The old stories say the ones they take are kept, not killed. Nobody here knows the way yet.' + (k === 'maren' ? ' Isla keeps the count of your rest days until Maren is back.' : k === 'tobiah' ? ' You still walk his rounds. He would know if you did not.' : '') : 'Taken by the Tallymen. ' + p.name + ' is held in their stockade until you bring them back.'}</span></li>`;
@@ -2299,17 +2496,23 @@ function renderCamp(){
       if ($('taleGo')) $('taleGo').onclick = () => openPersonSheet(t.who); }
     const waiting = asks(), a = waiting[0];
     $('askBox').innerHTML = a ? `<button class="bare ask" id="askGo">${pic('p-' + a.who, 'face sm')}<span><h3>${PEOPLE[a.who].name} is asking for you</h3><span class="small muted">${esc(a.t)}. ${esc(a.sub)}</span></span></button>` : `<p class="small muted">Nobody is asking anything of you just now. ${esc(CS2.line)}</p>`;
-    if ($('askGo')) $('askGo').onclick = () => { sheet = ''; showTab('walk'); window.scrollTo(0, 0); };
+    if ($('askGo')) $('askGo').onclick = () => { if (S.start && !S.start.got.walk){ S.start.got.walk = 1; save(); } sheet = ''; showTab('walk'); renderCamp(); window.scrollTo(0, 0); };
+    { const G = S.start, gb = $('growBox'), nk = G && G.news[0], N = nk === 'rounds' ? ROUNDS_NEWS : GROW.find(g => g.k === nk);
+      const where = {tobiah:'Tobiah sits at the fire now, and what he needs is on the Walk screen. The fire is yours to feed from tonight.', steps:'Today\'s steps are on the You screen now, under your glim. Pip\'s dare is on the Walk screen.', dack:'Dack is at the fire now. His work is on the Walk screen, and some of it is a fight.', isla:'Isla is at the fire now. The camp\'s water is yours to carry too.', oona:'Oona is at the fire now. Reeds are on the Walk screen, and her loom is at the longhouse.', build:'Tap a place in the picture to see what is broken there and what it would take to mend.', rounds:'Tap Tobiah at the fire to see his rounds.'};
+      gb.innerHTML = N ? `<div class="panel"><div class="newsrow">${pic('p-' + N.who, 'face sm')}<div><p class="eyebrow">New at the fire</p><h3>${esc(N.h)}</h3></div></div><p class="say">${esc(N.t)}</p><p class="small muted">${where[nk]}</p><button class="primary" id="growOk">Good</button></div>` : '';
+      if ($('growOk')) $('growOk').onclick = () => { G.news.shift(); save(); renderCamp(); }; }
     $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
+      if (!met(k)) return `<span class="shade" role="img" aria-label="Someone you have not met yet">${pic('p-' + k, 'face')}<span>&nbsp;</span><em>a shape</em></span>`;
       return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? (lost()[k] ? 'led away by the Unlit' : 'taken by the Tallymen') : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? (lost()[k] ? 'gone' : 'taken') : m.word}</em></button>`; }).join('');
     $('fire').querySelectorAll('button').forEach(b => b.onclick = () => openPersonSheet(b.dataset.person));
     const rows = [], nr = REPAIRS.find(r => !S.fixed[r.k]), nb = nextBuild();
     if (nr) rows.push(['house', nr.bad]);
     if (nb && !S.built[nb.k] && !rows.some(r => r[0] === nb.spot)) rows.push([nb.spot, nb.bad]);
     BUILDS.filter(b => b.side && !S.built[b.k] && !rows.some(r => r[0] === b.spot)).forEach(b => rows.push([b.spot, b.bad]));
-    $('missing').innerHTML = rows.length ? `<p class="eyebrow">What the camp is missing</p><div class="pack">${rows.map(r => `<button class="bare" data-spot="${r[0]}"><h3>${(SPOTS.find(sp => sp.k === r[0]) || {name:'Camp'}).name}</h3><span>${esc(r[1] || '')}</span></button>`).join('')}</div>` : '';
+    $('missing').innerHTML = rows.length && has('build') ? `<p class="eyebrow">What the camp is missing</p><div class="pack">${rows.map(r => `<button class="bare" data-spot="${r[0]}"><h3>${(SPOTS.find(sp => sp.k === r[0]) || {name:'Camp'}).name}</h3><span>${esc(r[1] || '')}</span></button>`).join('')}</div>` : '';
     $('missing').querySelectorAll('button').forEach(b => b.onclick = () => { openSpot = b.dataset.spot; tapN++; openSheet('place'); });
     $('pack').innerHTML = [['journal', 'Journal', S.journal.length + (S.journal.length === 1 ? ' entry' : ' entries')], ['finds', 'Old empire finds', frags().length ? frags().length + ' found' : 'Nothing yet'], ['map', 'Map of the known world', Object.keys(S.places || {}).length + (Object.keys(S.places || {}).length === 1 ? ' place' : ' places')], ['phone', 'Your phone', 'Dead. Settings are kept here.']]
+      .filter(r => !S.start || r[0] === 'journal' || r[0] === 'phone' || (r[0] === 'finds' ? frags().length : Object.keys(S.places || {}).length))
       .map(r => `<button class="bare" data-open="${r[0]}"><h3>${r[1]}</h3><span>${r[2]}</span></button>`).join('');
     $('pack').querySelectorAll('button').forEach(b => b.onclick = () => openSheet(b.dataset.open)); }
   { const cm = campMood(), cl = $('campLine'); if (cl) cl.textContent = cm.line;
@@ -2337,8 +2540,12 @@ function renderCamp(){
   $('taleOwn').innerHTML = taleHtml();
   if ($('forgetBtn')) $('forgetBtn').onclick = () => { if (forgetArmed) forgetTale(); else { forgetArmed = true; renderCamp(); } };
   $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
-  $('ideaPanel').hidden = !aiOn();
-  if (!$('ideaWho').options.length) $('ideaWho').innerHTML = Object.entries(PEOPLE).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('');
+  $('ideaPanel').hidden = !aiOn() || (!!S.start && !Object.keys(PEOPLE).some(k => met(k) && S.trust[k] >= 3));
+  { const ks = Object.keys(PEOPLE).filter(met); if ($('ideaWho').options.length !== ks.length) $('ideaWho').innerHTML = ks.map(k => `<option value="${k}">${PEOPLE[k].name}</option>`).join(''); }
+  if (document.activeElement !== $('nameSet')) $('nameSet').value = S.name || '';
+  $('pronSel').value = S.pron || look().pron;
+  $('lookSet').innerHTML = LOOKS.map(l => `<button class="bare${look().k === l.k ? ' on' : ''}" data-look="${l.k}" aria-pressed="${look().k === l.k}" aria-label="${l.alt}">${pic(l.pic, 'face', '')}</button>`).join('');
+  $('lookSet').querySelectorAll('button').forEach(b => b.onclick = () => { S.look = b.dataset.look; save(); renderCamp(); });
   $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : relayOn ? 'The villagers can talk back. Tap anyone at the fire on the Camp screen to talk to them. There is a daily limit on how much they will say.' + (relayUse ? ' Today you have had ' + relayUse.today.talk + ' of ' + relayUse.limit.talk + ' replies and ' + relayUse.today.story + ' of ' + relayUse.limit.story + ' story moments.' : '') : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
   $('keyBox').hidden = !!sampleFn || (relayOn && !apiKey);   // with the shared voice on, only someone who already saved a key sees the key box
   $('keyClear').hidden = !apiKey; $('modelSel').value = model;
@@ -2367,8 +2574,13 @@ $('saveInBtn').onclick = () => {
   const j = readSaveCode($('saveIn').value);
   if (!j){ $('saveLine').textContent = 'That is not a save from this game. It should start with LWB1:'; return; }
   if (S.home && !confirm('Replace the story on this copy of the game with the one you pasted? This cannot be undone.')) return;
-  S = migrate(Object.assign(blank(), j, {v:j.v || 1})); S.mission = null; save(); location.reload();
+  S = adopt(j); S.mission = null; save(); location.reload();
 };
+$('nameSave').onclick = () => { const v = $('nameSet').value.trim().replace(/\s+/g, ' ');
+  if (v && !NAME_OK.test(v)){ $('whoLine').textContent = 'Letters only, twenty at most.'; return; }
+  if (v) S.name = v; else delete S.name; save(); $('whoLine').textContent = v ? (rankIdx() > 0 ? 'The camp calls you ' + v + ' now.' : 'Pip calls you ' + v + '. The others will, once you have earned it.') : 'You are the Stranger again.'; renderCamp(); };
+$('pronSel').onchange = () => { S.pron = $('pronSel').value; save(); };
+$('replayBtn').onclick = () => { practice = true; store.set('lwb-mode', 'practice'); stopGPS(); pos = null; sim = null; geoError = ''; wantHome = 0; S = blank(); save(); sheet = ''; boot(); window.scrollTo(0, 0); };
 $('newsOk').onclick = () => { shortcutNews = ''; $('newsBanner').hidden = true; };
 $('glimAskBtn').onclick = askGlim; $('glimAsk').onkeydown = e => { if (e.key === 'Enter') askGlim(); };
 document.querySelectorAll('[data-tone]').forEach(b => b.onclick = () => { glimTone(b.dataset.tone); $('glimAns').textContent = GLIMSAY[b.dataset.tone]; });
@@ -2395,7 +2607,7 @@ function fillPrivacy(){ const e = $('privJournal'); if (e) e.innerHTML = '<div c
 function boot(){ fillPrivacy();
   if (S.home) newDay();
   if (practice){ if (S.home){ sim = S.mission && S.mission.lastFix ? {lat:S.mission.lastFix.lat, lng:S.mission.lastFix.lng} : {...S.home}; pos = {...sim, acc:5, t:Date.now(), sim:true}; } }
-  else if (S.intro) startGPS();
+  else if (S.intro || climbing()) startGPS();
   render();
 }
 const qp = new URLSearchParams(location.search), qs = qp.get('steps'), qh = parseHours(qp.get('hours') || '');   // a phone shortcut passes today's steps in the link
