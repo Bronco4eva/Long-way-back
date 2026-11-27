@@ -233,6 +233,16 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       </div>
       <p class="small num" id="stepLine"></p>
       <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem">
+        <h3>Ask your glim</h3>
+        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a soft pulse of light, the same one it makes when you take a step. Two pulses with the second sliding higher is yes. Two with the second sliding lower is no. Four pulses are the soft answers: the last one higher is maybe, the last one lower means it is not sure. Turn your ring switch on to hear it.</p>
+        <div class="row">
+          <input class="grow" style="flex-basis:8rem" type="text" id="glimAsk" maxlength="200" placeholder="Is Pip all right?">
+          <button id="glimAskBtn">Ask</button>
+        </div>
+        <p class="small" id="glimAns" aria-live="polite"></p>
+        <div class="row"><button class="quiet" data-tone="step">Hear a step</button><button class="quiet" data-tone="yes">Hear yes</button><button class="quiet" data-tone="no">Hear no</button><button class="quiet" data-tone="maybe">Hear maybe</button><button class="quiet" data-tone="unsure">Hear unsure</button></div>
+      </div>
       <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
     <section>
@@ -993,6 +1003,60 @@ function chime(notes){
       o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .55); t += .22;
     });
   } catch {}
+}
+/* The glim's voice, until it has words: a high rising pair for yes, a low falling pair for no, a wavering note for not knowing. */
+/* The glim's voice. It is a dot of light, so nothing is struck: each note swells in, then throbs outward in fading waves, in a soft hall. */
+let glimHall = null;
+function glimOut(){
+  if (glimHall) return glimHall;
+  const len = Math.floor(actx.sampleRate * 1.5), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+  let lp = 0; for (let i = 0; i < len; i++){ lp += ((Math.random() * 2 - 1) - lp) * .25; d[i] = lp * Math.exp(-i / actx.sampleRate * 4.6); }
+  const dry = actx.createGain(), wet = actx.createGain(), conv = actx.createConvolver(), inp = actx.createGain();
+  conv.buffer = buf; dry.gain.value = .7; wet.gain.value = .5;
+  inp.connect(dry).connect(actx.destination); inp.connect(conv).connect(wet).connect(actx.destination);
+  return glimHall = inp;
+}
+function glimNote(t, f1, f2, o){
+  const L = o.L || .22, rel = o.rel || .28, att = o.att || .05, vol = (o.vol || 1) * .32, end = t + L + rel * 4;
+  const g = actx.createGain(), trem = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + att); g.gain.setValueAtTime(vol, t + L); g.gain.setTargetAtTime(0.0001, t + L, rel);
+  [[1, 1], [2, .12]].forEach(([m, a]) => {
+    const osc = actx.createOscillator(), h = actx.createGain(); osc.type = 'sine'; h.gain.value = a;
+    osc.frequency.setValueAtTime(f1 * m, t); osc.frequency.setValueAtTime(f1 * m, t + L * .1); osc.frequency.exponentialRampToValueAtTime((f2 || f1) * m, t + L * .75);
+    osc.connect(h).connect(g); osc.start(t); osc.stop(end);
+  });
+  if (!o.plain){ // the waves of light: a slow throb that comes in as the note lets go
+    const lfo = actx.createOscillator(), depth = actx.createGain(); lfo.frequency.value = 8;
+    depth.gain.setValueAtTime(0, t + L * .5); depth.gain.linearRampToValueAtTime(.28, t + L * .5 + .3);
+    trem.gain.value = .72; lfo.connect(depth).connect(trem.gain); lfo.start(t); lfo.stop(end);
+  }
+  g.connect(trem).connect(glimOut());
+}
+function glimTone(kind){
+  try {
+    unlockSound(); if (!actx) return;
+    const t = actx.currentTime + .05, B = GLIM_DOOT, g = B.gap, soft = {rel:.18};
+    if (kind === 'step') glimNote(t, B.step, 0, {L:.08, rel:.09, att:.025, plain:true});
+    else if (kind === 'yes' || kind === 'no'){ glimNote(t, B.step, 0, {}); glimNote(t + g, B.step, kind === 'yes' ? B.up : B.down, {}); }
+    else { [0, 1, 2].forEach(i => glimNote(t + g * .8 * i, B.step, 0, soft)); glimNote(t + g * 2.4, B.step, kind === 'maybe' ? B.up : B.down, {}); }
+  } catch {}
+}
+const GLIM_DOOT = {step:587.3, up:784, down:440, gap:.42};
+const GLIMSAY = {step:'One soft pulse. A step.', yes:'Two pulses, the second sliding higher. Yes.', no:'Two pulses, the second sliding lower. No.', maybe:'Four pulses, the last sliding higher. Maybe.', unsure:'Four pulses, the last sliding lower. It is not sure.'};
+let glimBusy = false;
+async function askGlim(){
+  const q = $('glimAsk').value.trim(), out = $('glimAns'); if (!q || glimBusy) return;
+  unlockSound();
+  if (!aiOn()){ glimTone('unsure'); out.textContent = GLIMSAY.unsure + ' (It can only answer once villager voices are on.)'; return; }
+  glimBusy = true; $('glimAskBtn').disabled = true; out.textContent = 'It turns toward you…';
+  let a = 'unsure';
+  try {
+    const r = String(await askAI(worldBrief() + `
+
+The Stranger is asking a question of the glim at their shoulder. The glim is a small, loyal, living light. It has no words. It can only answer yes, no, maybe, or that it is not sure. Answer truthfully from the facts above, or from how a small light that loves walking and fears the dark would feel. Reply with exactly one word: yes, no, maybe, or unsure. Say maybe when the facts lean toward yes without settling it. Say unsure when the facts above do not settle it at all and it is not a matter of the glim's own feeling, and for anything that is not a yes or no question.`, [{role:'user', content:q.slice(0, 200)}], false)).toLowerCase();
+    a = /\bmaybe\b/.test(r) ? 'maybe' : /\bunsure\b/.test(r) ? 'unsure' : /\byes\b/.test(r) ? 'yes' : /\bno\b/.test(r) ? 'no' : 'unsure';
+  } catch (e){ out.textContent = aiErr(e); glimBusy = false; $('glimAskBtn').disabled = false; return; }
+  glimTone(a); out.textContent = GLIMSAY[a]; glimBusy = false; $('glimAskBtn').disabled = false;
 }
 function announce(title, body, notes){
   buzz(); chime(notes);
@@ -2306,6 +2370,8 @@ $('saveInBtn').onclick = () => {
   S = migrate(Object.assign(blank(), j, {v:j.v || 1})); S.mission = null; save(); location.reload();
 };
 $('newsOk').onclick = () => { shortcutNews = ''; $('newsBanner').hidden = true; };
+$('glimAskBtn').onclick = askGlim; $('glimAsk').onkeydown = e => { if (e.key === 'Enter') askGlim(); };
+document.querySelectorAll('[data-tone]').forEach(b => b.onclick = () => { glimTone(b.dataset.tone); $('glimAns').textContent = GLIMSAY[b.dataset.tone]; });
 $('stepBtn').onclick = () => {
   const n = Math.floor(+$('stepInput').value);
   if (!(n >= 0) || n > 200000){ $('stepLine').textContent = 'Enter a step count between 0 and 200,000.'; return; }
