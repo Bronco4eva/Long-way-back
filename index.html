@@ -242,6 +242,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
         </div>
         <p class="small" id="glimAns" aria-live="polite"></p>
         <div class="row"><button class="quiet" data-tone="step">Hear a step</button><button class="quiet" data-tone="yes">Hear yes</button><button class="quiet" data-tone="no">Hear no</button><button class="quiet" data-tone="maybe">Hear maybe</button><button class="quiet" data-tone="unsure">Hear unsure</button></div>
+        <p class="small">Hearing nothing? An iPhone keeps a web page silent while its ring switch is set to silent. Turn the ringer on to hear your glim.</p>
       </div>
       <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
@@ -991,7 +992,7 @@ function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); }
    unlocked by any tap while a walk is offered or under way), shows a card over the whole screen, and, where the game is
    allowed to send notifications, puts one on the phone too. */
 let actx = null;
-function unlockSound(){ try { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; actx = actx || new A(); if (actx.state !== 'running') actx.resume(); } catch {} }
+function unlockSound(){ try { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; actx = actx || new A(); if (actx.state !== 'running') actx.resume(); glimOut(); } catch {} }
 document.addEventListener('click', () => { if (S.mission || S.offer) unlockSound(); }, true);
 function chime(notes){
   try {
@@ -1011,15 +1012,16 @@ function glimOut(){
   if (glimHall) return glimHall;
   const len = Math.floor(actx.sampleRate * 1.5), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
   let lp = 0; for (let i = 0; i < len; i++){ lp += ((Math.random() * 2 - 1) - lp) * .25; d[i] = lp * Math.exp(-i / actx.sampleRate * 4.6); }
-  const dry = actx.createGain(), wet = actx.createGain(), conv = actx.createConvolver(), inp = actx.createGain();
-  conv.buffer = buf; dry.gain.value = .7; wet.gain.value = .5;
-  inp.connect(dry).connect(actx.destination); inp.connect(conv).connect(wet).connect(actx.destination);
+  const dry = actx.createGain(), wet = actx.createGain(), conv = actx.createConvolver(), inp = actx.createGain(), lim = actx.createDynamicsCompressor();
+  conv.buffer = buf; dry.gain.value = .6; wet.gain.value = .4; lim.threshold.value = -8; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = .003; lim.release.value = .25; // overlapping pulses never clip
+  inp.connect(dry).connect(lim); inp.connect(conv).connect(wet).connect(lim); lim.connect(actx.destination);
   return glimHall = inp;
 }
 function glimNote(t, f1, f2, o){
-  const L = o.L || .22, rel = o.rel || .28, att = o.att || .05, vol = (o.vol || 1) * .32, end = t + L + rel * 4;
+  const L = o.L || .22, rel = o.rel || .28, att = o.att || .05, vol = (o.vol || 1) * .32, tail = t + L + rel * 6, end = tail + .06;
   const g = actx.createGain(), trem = actx.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + att); g.gain.setValueAtTime(vol, t + L); g.gain.setTargetAtTime(0.0001, t + L, rel);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + att); g.gain.setValueAtTime(vol, t + L); g.gain.setTargetAtTime(0, t + L, rel);
+  g.gain.setValueAtTime(vol * Math.exp(-6), tail); g.gain.linearRampToValueAtTime(0, tail + .04); // fade right out before the note stops, so it never ends on a click
   [[1, 1], [2, .12]].forEach(([m, a]) => {
     const osc = actx.createOscillator(), h = actx.createGain(); osc.type = 'sine'; h.gain.value = a;
     osc.frequency.setValueAtTime(f1 * m, t); osc.frequency.setValueAtTime(f1 * m, t + L * .1); osc.frequency.exponentialRampToValueAtTime((f2 || f1) * m, t + L * .75);
@@ -1027,7 +1029,7 @@ function glimNote(t, f1, f2, o){
   });
   if (!o.plain){ // the waves of light: a slow throb that comes in as the note lets go
     const lfo = actx.createOscillator(), depth = actx.createGain(); lfo.frequency.value = 8;
-    depth.gain.setValueAtTime(0, t + L * .5); depth.gain.linearRampToValueAtTime(.28, t + L * .5 + .3);
+    depth.gain.value = 0; depth.gain.setValueAtTime(0, t + L * .5); depth.gain.linearRampToValueAtTime(.28, t + L * .5 + .3);
     trem.gain.value = .72; lfo.connect(depth).connect(trem.gain); lfo.start(t); lfo.stop(end);
   }
   g.connect(trem).connect(glimOut());
@@ -1035,7 +1037,7 @@ function glimNote(t, f1, f2, o){
 function glimTone(kind){
   try {
     unlockSound(); if (!actx) return;
-    const t = actx.currentTime + .05, B = GLIM_DOOT, g = B.gap, soft = {rel:.18};
+    const t = actx.currentTime + .12, B = GLIM_DOOT, g = B.gap, soft = {rel:.18};
     if (kind === 'step') glimNote(t, B.step, 0, {L:.08, rel:.09, att:.025, plain:true});
     else if (kind === 'yes' || kind === 'no'){ glimNote(t, B.step, 0, {}); glimNote(t + g, B.step, kind === 'yes' ? B.up : B.down, {}); }
     else { [0, 1, 2].forEach(i => glimNote(t + g * .8 * i, B.step, 0, soft)); glimNote(t + g * 2.4, B.step, kind === 'maybe' ? B.up : B.down, {}); }
