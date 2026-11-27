@@ -106,6 +106,17 @@ button:focus-visible,.linkbtn:focus-visible,input:focus-visible,select:focus-vis
 .alarm{border-left:4px solid var(--ember);padding:.25rem 0 .25rem .75rem}
 .tag.done{border-color:var(--moss);color:var(--moss)}
 canvas{width:100%;height:220px;display:block;border-radius:4px;background:var(--bg);border:2px solid var(--line)}
+.mapwrap{position:relative}#radar{height:300px;touch-action:pan-y}
+.mapctl{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
+.mapctl button{width:44px;height:44px;min-height:0;padding:0;display:grid;place-items:center;font:600 1.4rem/1 Barlow,system-ui,sans-serif;background:var(--raised);border:2px solid var(--line);border-radius:4px;color:var(--ink)}
+.mapctl button:disabled{opacity:.35}.mapctl button[aria-pressed="true"]{border-color:var(--water);color:var(--water)}
+.mapctl svg{width:24px;height:24px;fill:currentColor}
+.near{color:var(--moss)}
+.arrive{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:1rem;background:rgba(8,10,12,.82)}
+.arrive > div{width:100%;max-width:26rem;padding:1rem;text-align:center;background:var(--surface);border:3px solid var(--moss);border-radius:6px;animation:arrivePulse 1.2s ease-in-out 3}
+.arrive img{margin-bottom:.6rem}.arrive h2{font-size:1.9rem;margin:.2rem 0 .5rem}.arrive .eyebrow{color:var(--moss)}.arrive button{width:100%;margin-top:.6rem}
+@keyframes arrivePulse{50%{box-shadow:0 0 0 10px rgba(111,198,148,.35)}}
+@media (prefers-reduced-motion:reduce){.arrive > div{animation:none}}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
 .stats div{border-top:2px solid var(--line);padding-top:.35rem}
 .stats b{display:block;font:400 1.75rem/1.1 var(--display);font-variant-numeric:tabular-nums}
@@ -536,7 +547,7 @@ const MOVES = [{n:'jumping jacks', base:20}, {n:'squats', base:15}, {n:'push-ups
 const TINT = {wood:'#B98A5A', water:'#66BDD8', food:'#6FC694', stone:'#A7B0B8', fiber:'#D8C56A', herbs:'#C58BD0'};
 const artFor = T => T.res === 'feverbark' || T.res === 'captive' ? 'crossing' : T.res === 'herbs' ? 'food' : T.res;
 const pic = (src, cls, alt) => `<img class="${cls}" src="art/${src}.jpg" alt="${alt || ''}" onerror="this.hidden=true">`;
-const MAX_WALK_SPEED = 7, ARRIVE_M = 45, BATTLE_SECS = 120;
+const MAX_WALK_SPEED = 7, ARRIVE_M = 45, NEAR_M = 150, BATTLE_SECS = 120;
 
 /* ---------- storage ---------- */
 const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k,v); } catch {} } };
@@ -814,7 +825,7 @@ const PRIVACY = `<details class="lochelp priv"><summary>We do not track your loc
   <li>There is no account. The game's one small server only sends walk reminders and carries villager talk, as described below. The people who made this game never receive where you are or where you live.</li>
   <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
   <li>To pick a destination, the game asks OpenStreetMap's public map service for parks and trails around a rounded point about half a mile (1 km) wide, not your exact position.</li>
-  <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your home to the destination. Your exact home spot is not sent.</li>
+  <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your home to the destination. Your exact home spot is not sent. If you move the end point to where you are standing, that spot becomes the destination that is sent.</li>
   <li>The map in the game is drawn on your phone. If you tap the small map icon or "Open in Google Maps", Google receives where you are and the destination so it can draw the route. Nothing goes to Google unless you tap one of those.</li>
   
   <li>If you turn on Tobiah's calls, a small reminder server run by the game's maker keeps the address your phone uses for notifications, your time zone and the hours you chose, so it can call you. It never receives your location, your home or your progress, and turning the calls off deletes it.</li>
@@ -869,7 +880,7 @@ setInterval(() => {
 }, 4000);
 const gpsDiag = () => `Location check: permission ${gpsPerm || 'unknown'}, ${gpsFixes} readings, ${gpsPolls} tries${gpsWhy ? ', last result ' + gpsWhy : ', no answer from the phone yet'}.`;
 function stopGPS(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
-function crumb(m, fix){ if (!Array.isArray(m.trail)) m.trail = []; m.trail.push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
+function crumb(m, fix){ if (!Array.isArray(m.trail)) m.trail = []; if (m.lastFix && dist(m.lastFix, fix) > 3) course = bearing(m.lastFix, fix); m.trail.push([+fix.lat.toFixed(5), +fix.lng.toFixed(5)]); if (m.trail.length > 240) m.trail = m.trail.filter((_, i) => i % 2); }
 function onFix(fix){
   pos = fix;
   if (wantHome && (fix.acc <= 40 || (Date.now() - wantHome > 6000 && fix.acc <= 150))){
@@ -880,13 +891,14 @@ function onFix(fix){
     if (!m.lastFix) m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
     else {
       const d = dist(m.lastFix, fix), dt = (fix.t - m.lastFix.t) / 1000;
-      if (fix.sim){ m.meters += d; m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; crumb(m, fix); }
+      if (fix.sim){ m.meters += d; crumb(m, fix); m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; }
       else if (d >= Math.max(10, fix.acc * 0.6)){
         if (dt > 0 && d / dt <= MAX_WALK_SPEED) m.meters += d; else m.ride += d;
-        m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t}; crumb(m, fix);
+        crumb(m, fix); m.lastFix = {lat:fix.lat, lng:fix.lng, t:fix.t};
       }
     }
     const target = m.phase === 'out' ? m.site : S.home;
+    if (m.near !== m.phase && dist(fix, target) <= NEAR_M && m.meters > NEAR_M){ m.near = m.phase; chime([660]); }
     if (dist(fix, target) <= Math.max(ARRIVE_M, Math.min(fix.acc, 70))){
       if (m.phase === 'out'){ arrive(); return; }
       unload(); return;
@@ -896,6 +908,40 @@ function onFix(fix){
   if (viewKey() !== shownKey) render(); else tick();
 }
 function buzz(){ try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch {} }
+/* Telling you that you have arrived. iPhones cannot be made to vibrate by a web page, so arriving plays a chime (sound is
+   unlocked by any tap while a walk is offered or under way), shows a card over the whole screen, and, where the game is
+   allowed to send notifications, puts one on the phone too. */
+let actx = null;
+function unlockSound(){ try { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; actx = actx || new A(); if (actx.state !== 'running') actx.resume(); } catch {} }
+document.addEventListener('click', () => { if (S.mission || S.offer) unlockSound(); }, true);
+function chime(notes){
+  try {
+    unlockSound(); if (!actx) return;
+    let t = actx.currentTime + .05;
+    notes.forEach(f => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.5, t + .03); g.gain.exponentialRampToValueAtTime(0.0001, t + .5);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .55); t += .22;
+    });
+  } catch {}
+}
+function announce(title, body, notes){
+  buzz(); chime(notes);
+  try { if (!practice && 'Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker) navigator.serviceWorker.ready.then(r => r.showNotification(title, {body, tag:'arrive', icon:'art/icon-192.png', badge:'art/icon-192.png'})).catch(() => {}); } catch {}
+}
+function showArrive(){
+  const m = S.mission, old = $('arriveCard');
+  if (!m || !m.arrived || m.arriveSeen){ if (old) old.remove(); return; }
+  if (old) return;
+  const T = TASKS[m.id], place = m.name ? esc(m.name) : 'the ' + SITE[T.res], d = document.createElement('div');
+  d.id = 'arriveCard'; d.className = 'arrive'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-labelledby', 'arriveH');
+  d.innerHTML = `<div>${pic('s-' + artFor(T), 'scene strip', 'The ' + SITE[T.res])}<p class="eyebrow">You made it</p><h2 id="arriveH">You have reached ${place}</h2>
+    <p>${T.battle === 'dare' ? 'Pip is waiting with a dare. A short workout, then home.' : T.battle ? 'You are not alone here. A short workout to hold your ground, then home.' : T.rescue || T.arc ? 'You have what you came for. Now walk it home to Hollow Ash.' : 'Your pack is loaded. Now carry it home to Hollow Ash.'}</p>
+    <p class="small muted num">${fmtDist(m.meters)} walked so far.</p><button class="primary" id="arriveOk">${T.battle ? 'Start the workout' : 'Head for home'}</button></div>`;
+  document.body.appendChild(d);
+  $('arriveOk').onclick = () => { m.arriveSeen = true; save(); d.remove(); };
+  $('arriveOk').focus();
+}
 let wake = null;
 async function keepAwake(){ try { wake = await navigator.wakeLock.request('screen'); } catch {} }
 document.addEventListener('visibilitychange', () => { if (!document.hidden){ newDay(); if (S.mission) keepAwake(); if (S.home && !geoBlocked) restartGPS(); wantRoute(); render(); } });
@@ -1040,7 +1086,39 @@ function fixBox(T){
     <div class="row"><button class="primary grow" id="fixSend">Tell ${who}</button><button class="quiet" id="fixCancel">Never mind</button></div>
     <p class="small muted">${aiOn() ? who + ' will answer and send you somewhere else.' : 'You will be sent somewhere else. Bad spots are not offered again.'}</p></div>`;
 }
+/* Moving the end point. Map data sometimes puts a spot on ground you cannot walk onto. The end can be moved a short way
+   (inside a ring round where it started) by tapping the map, or dropped where you are standing once you are inside the
+   ring. The moved spot is what gets remembered as the place from then on. */
+let moveOpen = false, moveSay = '', lastView = null;
+const moveReach = o => Math.round(Math.max(200, Math.min(600, dist(S.home, o.site0 || o.site) * .4)));
+function moveBox(){
+  const o = S.mission || S.offer;
+  if (!moveOpen) return '<button class="quiet" id="moveOpen">Can\'t reach it? Move the end point</button>';
+  const R = moveReach(o), d = pos ? dist(pos, o.site0 || o.site) : null, here = S.mission && d != null && d <= R;
+  return `<div class="panel fixbox"><h3>Move the end point</h3>
+    <p class="small">Tap the map where you can actually get to. The end can move up to ${fmtDist(R)}, anywhere inside the dashed ring. Zoom in first if it helps.</p>
+    ${S.mission ? `<button class="primary" id="moveHere"${here ? '' : ' disabled'}>End it where I am standing</button>${here ? '' : `<p class="small muted">${d == null ? 'This works once your location is found.' : 'You are ' + fmtDist(d) + ' from the spot. Get inside the ring and you can end it where you stand.'}</p>`}` : ''}
+    ${moveSay ? `<p class="small" aria-live="polite"><b>${esc(moveSay)}</b></p>` : ''}
+    <div class="row">${o.site0 ? '<button class="grow" id="moveUndo">Put it back</button>' : ''}<button class="quiet grow" id="moveDone">Done</button></div></div>`;
+}
+function moveEnd(p){
+  const o = S.mission || S.offer; if (!o || (S.mission && S.mission.phase !== 'out')) return;
+  if (!o.site0) o.site0 = {lat:o.site.lat, lng:o.site.lng};
+  const R = moveReach(o), d = dist(o.site0, p), clamped = d > R;
+  if (clamped) p = project(o.site0, bearing(o.site0, p), R);
+  o.site = {lat:+p.lat.toFixed(6), lng:+p.lng.toFixed(6)}; o.oneWay = dist(S.home, o.site); o.route = null; o.routeM = 0; o.near = null;
+  moveSay = clamped ? 'That was outside the ring, so the end is at the edge nearest your tap.' : 'Moved. The end point is now ' + (pos ? fmtDist(dist(pos, o.site)) + ' from you.' : 'where you tapped.');
+  save(); wantRoute(); render();
+  if (S.mission && pos) onFix(pos);
+}
+function wireMove(){
+  if ($('moveOpen')) $('moveOpen').onclick = () => { moveOpen = true; moveSay = ''; render(); const c = $('radar'); if (c) c.scrollIntoView({block:'center', behavior:'smooth'}); };
+  if ($('moveDone')) $('moveDone').onclick = () => { moveOpen = false; moveSay = ''; render(); };
+  if ($('moveHere')) $('moveHere').onclick = () => { if (pos){ moveOpen = false; moveEnd(pos); } };
+  if ($('moveUndo')) $('moveUndo').onclick = () => { const o = S.mission || S.offer; o.site = o.site0; delete o.site0; o.oneWay = dist(S.home, o.site); o.route = null; o.routeM = 0; moveSay = 'Back where it started.'; save(); wantRoute(); render(); };
+}
 function wireFix(){
+  wireMove();
   if ($('fixOpen')) $('fixOpen').onclick = () => { fixOpen = true; render(); };
   if ($('fixCancel')) $('fixCancel').onclick = () => { fixOpen = false; render(); };
   document.querySelectorAll('[data-fix]').forEach(b => b.onclick = () => fixPlace(b.dataset.why, b.dataset.fix));
@@ -1049,13 +1127,14 @@ function wireFix(){
 function startMission(){
   const o = S.offer; if (!o) return;
   S.mission = {id:o.id, site:o.site, oneWay:o.oneWay, name:o.name, real:o.real, onTrail:o.onTrail, route:o.route || null, routeM:o.routeM || 0, phase:'out', t0:Date.now(), meters:0, ride:0, lastFix:null, won:null, reps:0, move:Math.floor(Math.random() * MOVES.length), bt0:0};
-  S.offer = null; S.last = null; tried = []; fixSay = ''; fixOpen = false; save();
+  S.offer = null; S.last = null; tried = []; fixSay = ''; fixOpen = false; moveOpen = false; moveSay = ''; save(); course = null; mapZoom = 1;
   startGPS(); keepAwake(); render();
   if (pos) onFix(pos);
 }
 const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TASKS[m.id].arc || TASKS[m.id].rescue ? 1.5 : 1) * (1 - 0.1 * (perks().wind || 0)) * (1 - 0.1 * kit(i => i.reps).length));
 function arrive(){
-  const m = S.mission; buzz();
+  const m = S.mission; m.arrived = Date.now(); m.arriveSeen = false;
+  announce('You made it', 'You have reached ' + (m.name || 'the ' + SITE[TASKS[m.id].res]) + '. Open the game for what comes next.', [523, 659, 784, 1047]);
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
   if (!had || ptKey(had.site) !== ptKey(m.site)){
     places()[pk] = {site:m.site, oneWay:m.oneWay, name:m.name, real:!!m.real, onTrail:!!m.onTrail, route:m.route || null, routeM:m.routeM || 0, found:today()};
@@ -1075,6 +1154,7 @@ function endBattle(won){
   buzz(); save(); render();
 }
 function unload(){
+  announce('Back at Hollow Ash', 'You are home. Open the game to unload.', [784, 659, 523]);
   const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
   const before = {sleep:sleep(), carry:gear(), rank:rankIdx(), lvl:level()};
   const notes = [];
@@ -1458,9 +1538,11 @@ const INTRO = [
    html:'<p>At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"He fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>'}
 ];
 const viewKey = () => !S.intro ? 'intro' + introStep : !S.home ? 'nohome' + (wantHome ? 'w' : '') + geoError + geoBlocked : S.mission ? 'm' + S.mission.phase : scouting ? 'scouting' : S.offer ? 'offer' : 'board';
-const radarBox = cap => `<canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
+const radarBox = cap => `<div class="mapwrap"><canvas id="radar" aria-label="Map sketch of camp, the destination and you"></canvas>
+  <div class="mapctl"><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button>${S.mission ? '<button id="faceBtn" aria-label="Turn the map to face the way I am facing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 19 21 12 17 5 21Z"/></svg></button>' : ''}</div></div>
   <div class="maprow"><p class="small muted grow">${cap}</p>${practice || !GMAPS_KEY ? '' : '<button class="mapicon" id="gmapBtn" aria-label="Check the route on Google Maps" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg></button>'}</div><div id="gmapSlot"></div>`;
 function wireGmap(a, b){
+  wireMap();
   const btn = $('gmapBtn'); if (!btn) return;
   btn.onclick = () => { const slot = $('gmapSlot'), on = !slot.innerHTML; slot.innerHTML = on ? realMap(a, b) : ''; btn.setAttribute('aria-pressed', on); if (on) slot.scrollIntoView({block:'nearest', behavior:'smooth'}); };
 }
@@ -1486,7 +1568,7 @@ function onOrient(e){
   else if (e.absolute && e.alpha != null) h = 360 - e.alpha;
   if (h == null) return;
   h += (screen.orientation && screen.orientation.angle) || 0;
-  heading = ((h % 360) + 360) % 360; updateCompass();
+  heading = ((h % 360) + 360) % 360; updateCompass(); queueRadar();
 }
 const needsCompassTap = () => typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
 async function startCompass(){
@@ -1518,7 +1600,7 @@ function updateCompass(){
 }
 // One plain line on what a task asks of the player, shown on the task card, the task detail and the walking screen.
 function howTo(T){
-  const mid = T.battle === 'dare' ? 'do a short workout to beat the dare' : T.battle ? 'do a short workout to hold your ground' : 'your phone buzzes when you reach it';
+  const mid = T.battle === 'dare' ? 'do a short workout to beat the dare' : T.battle ? 'do a short workout to hold your ground' : 'the game chimes and tells you when you reach it';
   const gain = T.rescue ? 'You walk one captive home.' : T.arc ? 'You carry the feverbark home.' : 'You bring back up to ' + carry() + ' ' + RES[T.res].toLowerCase() + ' for the stores.';
   return 'What to do: walk to the ' + SITE[T.res] + ', ' + mid + ', then walk home.' + (T.battle ? ' ' : ' No workout. ') + gain;
 }
@@ -1540,7 +1622,7 @@ function taskRow(id, arc){
     ${done ? '' : `<button data-t="${id}" class="${arc ? 'primary' : ''}">Take this task</button>`}</li>`;
 }
 function render(){
-  shownKey = viewKey();
+  shownKey = viewKey(); showArrive();
   const el = $('main'), m = S.mission;
   $('practiceBanner').hidden = !practice;
   { const y = S.intro && S.home && !S.mission ? tallyDue() : null, box = $('tallyBox'); box.hidden = !y;
@@ -1596,17 +1678,18 @@ function render(){
     const place = m.name ? esc(m.name) : 'the ' + SITE[T.res];
     el.innerHTML = `${out ? pic('s-' + artFor(T), 'scene strip', 'The ' + SITE[T.res]) : villagePic('scene strip')}<p class="eyebrow">${out ? 'Outbound' : 'Homeward'}</p>
       <h2>${out ? 'Get to ' + place : T.rescue ? (m.won ? 'You have ' + PEOPLE[takenList()[0] || 'pip'].name + '. Walk them home.' : 'Driven off. Get back to camp.') : T.arc ? 'You have the feverbark. Get it home.' : 'Loaded up. Carry it back to Hollow Ash.'}</h2>
-      <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. Your phone buzzes when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
+      <p class="small" id="taskLine"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${out ? (T.battle === 'dare' ? 'When you get there the dare starts: a short workout, then home.' : T.battle ? 'When you get there you will have to hold your ground: a short workout, then home.' : 'Nothing to do there but arrive. The game chimes and puts a card on the screen when you reach it, then you carry the load home.') : T.rescue || T.arc ? 'Reach camp to finish.' : 'Reach camp to finish. What you carry goes into the stores.'}</p>
       ${!out && m.frag != null ? `<div class="frag"><p class="eyebrow">${String(m.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(m.frag))}</p></div>` : ''}${!out && m.item && item(m.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(m.item).name)}.</b> ${esc(item(m.item).found)}</p><p class="small">${item(m.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(m.item).who].name + '. '}Get it home and it counts.</p></div>` : ''}
       <div class="cmprow"><div class="grow"><div class="big num" id="dBig">…</div><p class="muted" id="dLine"></p></div>
         ${practice ? '' : '<div class="cmp" id="cmp" aria-hidden="true"><i class="cmp-n">N</i><svg id="cmpArrow" viewBox="0 0 60 60" width="64" height="64"><path d="M30 6 L46 46 L30 37 L14 46 Z"/></svg></div>'}</div>
       ${practice ? '' : '<p class="small" id="cmpLine" aria-live="polite"></p><button id="cmpBtn" hidden>Turn on the compass</button>'}
-      ${radarBox((m.route ? 'Blue dots are the walking path. ' : 'The dashed line is the straight direction until the walking path loads. ') + 'The ringed dot is you, and green marks where you have walked.')}
+      ${radarBox((m.route ? 'Blue dots are the walking path. ' : 'The dashed line is the straight direction until the walking path loads. ') + 'The ringed dot is you, and green marks where you have walked. Pinch or use + and − to zoom. The arrow button turns the map so the way you are facing is up.')}
       <div class="stats"><div><b id="sWalk">0</b><span class="small muted">on foot</span></div><div><b id="sTime">0:00</b><span class="small muted">time</span></div><div><b id="sSteps">0</b><span class="small muted">steps (est.)</span></div></div>
       <div class="row">
         ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Open in Google Maps</a>'}
         <button class="quiet" id="abandon">Turn back</button>
       </div>
+      ${out ? moveBox() : ''}
       ${practice || !out ? '' : fixBox(T)}
       <p class="small muted" id="gpsLine"></p>
       ${practice ? '' : '<button class="primary" id="gpsRetry" hidden>Tap to find my location</button><p class="small muted" id="gpsDiag"></p>'}`;
@@ -1631,6 +1714,7 @@ function render(){
       <p class="small muted">${o.known ? 'You have been here before. The ' + placeName(placeKey(T)) + ' stays where you found it. ' : 'New ground. Once you reach it, it stays on your map. '}${o.onTrail ? 'This spot is on a mapped trail.' : o.real ? 'This is a mapped park or playing field.' : practice ? 'Practice mode uses made-up ground.' : 'The map service did not answer, so this is an unchecked point on the map. Find another if it lands somewhere you cannot walk.'}${T.battle ? ' Expect a workout when you get there.' : ''} ${T.rescue ? '' : 'You can carry ' + carry() + ' back.'}</p>
       <p class="small howto">${howTo(T)}</p>
       <div class="row"><button class="primary grow" id="go">Head out</button><button class="grow" id="again">${o.known ? 'Scout a new ' + placeName(placeKey(T)) : 'Find another place'}</button></div>
+      ${moveBox()}
       ${practice ? '' : fixBox(T)}
       <button class="quiet" id="back">Back to the board</button>`;
     wireFix();
@@ -1681,7 +1765,9 @@ function tick(){
   const tg = m.phase === 'out' ? m.site : S.home;
   if (pos){
     $('dBig').textContent = fmtDist(dist(pos, tg));
-    $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
+    const nearly = dist(pos, tg) <= NEAR_M;
+    $('dBig').classList.toggle('near', nearly);
+    $('dLine').textContent = nearly ? (m.phase === 'out' ? 'Nearly there. Keep going until the game tells you.' : 'Nearly home.') : 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : pos.acc > 100 ? 'Your phone only knows where you are to within ' + Math.round(pos.acc) + ' m, which is too rough to count this walk. It usually sharpens once you are outside and moving.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
   } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open You, then Your phone, and tap Location help.' : geoError || 'Finding your location. Tap anywhere on the screen if this does not clear in a few seconds.'; }
   updateCompass();
@@ -1717,6 +1803,35 @@ function drawWorld(){
   g.fillStyle = col('--muted'); g.textAlign = 'left'; g.fillText('N ↑', 10, 18);
   const n = list.length, line = $('worldLine'); if (line) line.textContent = n ? n + (n === 1 ? ' place' : ' places') + ' found. Each kind has its own color, matching the stores bar. The white dot is you. Moving home base wipes the map.' : 'Nothing found yet. Places appear here once you reach them, and they stay put.';
 }
+/* The walking map. It can be zoomed (buttons or a pinch) and, on a walk, turned so that the way you are facing is up.
+   Zoomed out it shows the whole trip; zoomed in it follows you. Nothing here is saved with the game except the choice
+   of facing-up or north-up, which is kept on the phone beside the save. */
+let mapZoom = 1, mapFace = store.get('lwb-mapface') !== 'north', course = null, mapRot = 0, radarQueued = false, pinch = null;
+const MAX_ZOOM = 16;
+function queueRadar(){ if (radarQueued) return; radarQueued = true; requestAnimationFrame(() => { radarQueued = false; drawRadar(); }); }
+function setZoom(z){ mapZoom = Math.max(1, Math.min(MAX_ZOOM, z)); syncMapCtl(); queueRadar(); }
+function syncMapCtl(){
+  const i = $('zoomIn'), o = $('zoomOut'), f = $('faceBtn');
+  if (i) i.disabled = mapZoom >= MAX_ZOOM; if (o) o.disabled = mapZoom <= 1;
+  if (f){ f.setAttribute('aria-pressed', mapFace); f.setAttribute('aria-label', mapFace ? 'The map turns with you. Tap to keep north at the top.' : 'North is at the top. Tap to turn the map the way you are facing.'); }
+}
+function wireMap(){
+  const c = $('radar'); if (!c) return;
+  $('zoomIn').onclick = () => setZoom(mapZoom * 1.6); $('zoomOut').onclick = () => setZoom(mapZoom / 1.6);
+  if ($('faceBtn')) $('faceBtn').onclick = () => { mapFace = !mapFace; store.set('lwb-mapface', mapFace ? 'face' : 'north'); if (mapFace) startCompass(); syncMapCtl(); queueRadar(); };
+  const gap = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  c.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch = {d:gap(e), z:mapZoom}; }, {passive:true});
+  c.addEventListener('touchmove', e => { if (pinch && e.touches.length === 2){ e.preventDefault(); setZoom(pinch.z * gap(e) / pinch.d); } }, {passive:false});
+  c.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; }, {passive:true});
+  c.addEventListener('click', e => {
+    if (!moveOpen || !lastView) return;
+    const r = c.getBoundingClientRect(), v = lastView, u = (e.clientX - r.left - v.ax) / v.k, n = (v.ay - (e.clientY - r.top)) / v.k;
+    const x = u * v.cs + n * v.sn + v.O.x, y = -u * v.sn + n * v.cs + v.O.y;
+    moveEnd({lat:v.mid.lat + y / 110540, lng:v.mid.lng + x / (111320 * Math.cos(rad(v.mid.lat)))});
+  });
+  c.addEventListener('wheel', e => { e.preventDefault(); setZoom(mapZoom * (e.deltaY < 0 ? 1.25 : .8)); }, {passive:false});
+  syncMapCtl();
+}
 function drawRadar(){
   const c = $('radar'), m = S.mission || S.offer; if (!c || !m) return;
   const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
@@ -1728,30 +1843,58 @@ function drawRadar(){
   const xy = p => ({x:(p.lng - mid.lng) * 111320 * Math.cos(rad(mid.lat)), y:(p.lat - mid.lat) * 110540});
   const pts = [xy(S.home), xy(m.site)]; if (pos) pts.push(xy(pos));
   const trail = (Array.isArray(m.trail) ? m.trail : []).map(t => xy({lat:t[0], lng:t[1]})), route = (m.route || []).map(t => xy({lat:t[0], lng:t[1]}));
-  const ext = Math.max(40, ...pts.concat(trail, route).map(p => Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
-  const k = (h / 2 - 28) / ext, P = p => ({x:w / 2 + p.x * k, y:h / 2 - p.y * k});
+  // Which way is up: the compass if the phone has one, else the direction you have been walking, else north.
+  const facing = S.mission ? (heading != null ? heading : course) : null, turned = mapFace && facing != null;
+  if (turned) mapRot = heading != null ? mapRot + (spin(mapRot, facing) - mapRot) * .4 : facing;
+  const th = turned ? rad(mapRot) : 0, cs = Math.cos(th), sn = Math.sin(th);
+  const all = pts.concat(trail, route), follow = mapZoom > 1 && pos;
+  // Turned, the trip has to fit whichever way round it is, so fit a circle rather than a box.
+  const ext = Math.max(40, ...all.map(p => turned ? Math.hypot(p.x, p.y) : Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
+  const k = ((turned ? Math.min(w, h) : h) / 2 - 28) / ext * mapZoom;
+  const O = follow ? pts[2] : {x:0, y:0}, ax = w / 2, ay = follow && turned ? h * .62 : h / 2;
+  const P = p => { const dx = p.x - O.x, dy = p.y - O.y; return {x:ax + (dx * cs - dy * sn) * k, y:ay - (dx * sn + dy * cs) * k}; };
+  // Camp and the destination stay in view when zoomed in: off the edge, they are pinned to it in the right direction.
+  const pin = q => { const lx = 18, rx = w - 64, ty = 26, by = h - 26; if (q.x >= lx && q.x <= rx && q.y >= ty && q.y <= by) return q;
+    const dx = q.x - ax, dy = q.y - ay, f = Math.min(dx > 0 ? (rx - ax) / dx : dx < 0 ? (lx - ax) / dx : 9, dy > 0 ? (by - ay) / dy : dy < 0 ? (ty - ay) / dy : 9);
+    return {x:ax + dx * f, y:ay + dy * f, off:true}; };
   const H = P(pts[0]), T = P(pts[1]);
+  lastView = {ax, ay, k, cs, sn, O, mid};
   g.strokeStyle = col('--line'); g.lineWidth = 1;
-  for (let r = 1; r <= 3; r++){ g.beginPath(); g.arc(w / 2, h / 2, (h / 2 - 8) * r / 3, 0, 7); g.stroke(); }
+  if (moveOpen){ // how far the end point may be moved
+    const q = P(xy(m.site0 || m.site)); g.save(); g.setLineDash([5, 5]); g.strokeStyle = col('--warn'); g.lineWidth = 2; g.beginPath(); g.arc(q.x, q.y, moveReach(m) * k, 0, 7); g.stroke(); g.restore();
+  } else for (let r = 1; r <= 3; r++){ g.beginPath(); g.arc(ax, ay, (h / 2 - 8) * r / 3, 0, 7); g.stroke(); }
   if (route.length > 1){
     const R = [H].concat(route.map(P)); g.fillStyle = col('--water'); let carry = 0;
     for (let i = 1; i < R.length; i++){
       const dx = R[i].x - R[i - 1].x, dy = R[i].y - R[i - 1].y, L = Math.hypot(dx, dy); if (!L) continue;
-      let d = carry; for (; d <= L; d += 9){ g.beginPath(); g.arc(R[i - 1].x + dx * d / L, R[i - 1].y + dy * d / L, 2.2, 0, 7); g.fill(); }
+      let d = carry; for (; d <= L; d += 9){ const x = R[i - 1].x + dx * d / L, y = R[i - 1].y + dy * d / L; if (x < -5 || y < -5 || x > w + 5 || y > h + 5) continue; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); }
       carry = d - L;
     }
   } else { g.setLineDash([6, 6]); g.strokeStyle = col('--muted'); g.lineWidth = 1.5; g.beginPath(); g.moveTo(H.x, H.y); g.lineTo(T.x, T.y); g.stroke(); g.setLineDash([]); }
-  g.font = '600 12px Barlow, system-ui, sans-serif'; g.textAlign = 'center';
-  g.fillStyle = col('--ink'); g.fillRect(H.x - 7, H.y - 7, 14, 14); g.fillText('CAMP', H.x, H.y + (H.y > h / 2 ? 22 : -12));
-  g.fillStyle = placeColor(placeKey(TASKS[m.id])); g.beginPath(); g.moveTo(T.x, T.y - 9); g.lineTo(T.x + 9, T.y); g.lineTo(T.x, T.y + 9); g.lineTo(T.x - 9, T.y); g.fill();
-  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase(), T.x, T.y + (T.y > h / 2 ? 24 : -14));
   g.fillStyle = col('--moss'); trail.forEach(t => { const q = P(t); g.fillRect(q.x - 2.5, q.y - 2.5, 5, 5); });
+  g.font = '600 12px Barlow, system-ui, sans-serif'; g.textAlign = 'center';
+  const Hp = pin(H), Tp = pin(T), far = (q, to) => q.off && pos ? ' ' + fmtDist(dist(pos, to)) : '';
+  g.globalAlpha = Hp.off ? .75 : 1;
+  g.fillStyle = col('--ink'); g.fillRect(Hp.x - 7, Hp.y - 7, 14, 14); g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -12 : 22));
+  g.globalAlpha = Tp.off ? .75 : 1;
+  g.fillStyle = placeColor(placeKey(TASKS[m.id])); g.beginPath(); g.moveTo(Tp.x, Tp.y - 9); g.lineTo(Tp.x + 9, Tp.y); g.lineTo(Tp.x, Tp.y + 9); g.lineTo(Tp.x - 9, Tp.y); g.fill();
+  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase() + far(Tp, m.site), Tp.x, Tp.y + (Tp.y > h / 2 ? -14 : 24));
+  g.globalAlpha = 1;
   if (pos){
     const U = P(pts[2]);
     g.fillStyle = col('--water'); g.globalAlpha = .2; g.beginPath(); g.arc(U.x, U.y, Math.max(10, Math.min(60, pos.acc * k)), 0, 7); g.fill(); g.globalAlpha = 1;
+    if (facing != null){ // a nose on the dot, showing which way you face
+      const a = rad(facing) - th; g.save(); g.translate(U.x, U.y); g.rotate(a); g.beginPath(); g.moveTo(0, -15); g.lineTo(6, -5); g.lineTo(-6, -5); g.fill(); g.restore();
+    }
     g.beginPath(); g.arc(U.x, U.y, 6, 0, 7); g.fill(); g.strokeStyle = col('--surface'); g.lineWidth = 2; g.stroke();
   }
-  g.fillStyle = col('--muted'); g.textAlign = 'left'; g.fillText('N ↑', 10, 18);
+  // North marker, turning with the map, and a scale bar.
+  g.save(); g.translate(20, 24); g.fillStyle = col('--muted'); g.textAlign = 'center'; g.rotate(-th);
+  g.beginPath(); g.moveTo(0, -14); g.lineTo(5, -5); g.lineTo(-5, -5); g.fill(); g.fillText('N', 0, 9); g.restore();
+  const FT = .3048, bars = units === 'mi' ? [[5280 * FT, '1 mi'], [2640 * FT, '½ mi'], [1320 * FT, '¼ mi'], [500 * FT, '500 ft'], [200 * FT, '200 ft'], [100 * FT, '100 ft'], [50 * FT, '50 ft'], [20 * FT, '20 ft']] : [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5].map(n => [n, n >= 1000 ? n / 1000 + ' km' : n + ' m']);
+  const [bar, barName] = bars.find(b => b[0] * k <= 90) || bars[bars.length - 1];
+  g.strokeStyle = g.fillStyle = col('--muted'); g.lineWidth = 2; g.beginPath(); g.moveTo(10, h - 16); g.lineTo(10, h - 11); g.lineTo(10 + bar * k, h - 11); g.lineTo(10 + bar * k, h - 16); g.stroke();
+  g.textAlign = 'left'; g.fillText(barName, 10, h - 21);
 }
 const talkIdx = {};
 function renderCamp(){
