@@ -355,7 +355,7 @@ const PEOPLE = {
   dack:{name:'Dack', role:'Hunter. Says what the others only think.', lines:[
     ['You eat more than you carry. I can count.', 'Soft hands. We will see how long that lasts out here.'],
     ['You kept up most of the way. Most.', 'Take the spare water skin. Do not make it a thing.'],
-    ['If the Tallymen come over the ridge, you stand next to me.', 'I was wrong about you. I will only say it the once.']]},
+    ['If the fire ever goes out, you stand next to me.', 'I was wrong about you. I will only say it the once.']]},
   pip:{name:'Pip', role:'Ten years old. Nobody left but the camp.', lines:[
     ['I counted your steps. You stop a lot.', 'Is it true you came from a place with food in bags?'],
     ['You were faster today. I checked.', 'I told Dack you are not that slow. He laughed, but I told him.'],
@@ -403,8 +403,8 @@ const BUILDS = [
    bad:'Hides rot before they can be cured, fish are caught by hand, and there is nowhere to keep an animal.', hurt:'Tobiah patches the same boots every week with cord, because there is no leather.', good:'A stable in the old ruins with its yard open to the road, a fishing hut on the bend and hides curing by the water. Tobiah made you a strap that does not cut.'},
   {k:'road', spot:'ruins', who:'maren', name:'Pave the road in stone', the:'the stone road', cost:{stone:30}, perk:'Maren owes you rest. One more rest day banked.',
    bad:'The old road is mud to the ankle from the bridge to the arch.', hurt:'Maren hauls every cart through it herself, because she will not ask anyone else to.', good:'The road is stone again from the bridge to the arch, the way whoever built it meant. Maren walked it once in dry boots and told you to take a day.'},
-  {k:'walls', spot:'ruins', who:'dack', name:'Timber wall and watchtower', cost:{wood:30, stone:10}, perk:'The Tallymen need a day longer before they dare come.',
-   bad:'Anyone can walk in through the old arch, and the Tallymen know it.', hurt:'Dack sleeps sitting up in the gap, so they would have to step over him.', good:'A timber wall across the gap, a gate, and a watchtower on the rock. Dack climbed it at dusk and stayed up there, smiling at nothing.'},
+  {k:'walls', spot:'ruins', who:'dack', name:'Timber wall and watchtower', cost:{wood:30, stone:10}, perk:'A watch fire on the tower. The camp can stand one dark night before the Unlit come close.',
+   bad:'The gap at the old arch is open to the dark, and the firelight does not reach it.', hurt:'Dack sits up in the gap all night with his back to the fire, closer to the shadows than anyone should be.', good:'A timber wall across the gap, a gate, and a watchtower on the rock. Dack climbed it at dusk and stayed up there, smiling at nothing.'},
   {k:'stone', spot:'ruins', who:'maren', name:'Rebuild Hollow Ash in stone', the:'the rebuilding in stone', cost:{stone:40, wood:20}, perk:'Hollow Ash will stand. The first night anyone sleeps soundly.',
    bad:'Thatch burns and timber rots. Everything here could be gone in one bad night.', hurt:'Maren has watched one town burn. She counts the roofs here every evening.', good:'Stone walls, slate roofs and a tower on the rock. Hollow Ash is a town again. Maren stopped counting the roofs.'}
 ];
@@ -631,7 +631,11 @@ const villagePic = cls => pic('village-' + villageStage(), cls, 'Hollow Ash at d
 const carryName = () => gear() === 20 ? "Oona's woven pack" : gear() === 10 ? "Oona's sling" : 'Your two hands';
 const sleep = () => S.trust.maren >= 6 && S.built.ring ? 'Your own bunk in the lean-to' : REPAIRS.every(r => S.fixed[r.k]) ? 'Inside the longhouse, on a bench you built' : S.trust.maren >= 3 ? 'The longhouse floor on cold nights' : S.built.ring ? 'Outside, close to the fire ring' : 'Outside, by the fire';
 const rations = () => S.hungry ? 'Thin for everyone. The stores ran dry.' : standing() >= 5 ? 'A full share' : 'Half a share, eaten last';
-const needs = () => ({food:2 - (S.built.granary ? 1 : 0) - (S.built.fields ? 1 : 0), water:S.built.well ? 1 : 2, wood:1});
+/* The night fire. The Unlit will not cross light, so the fire burns from dusk to dawn and eats wood. Any finished walk brings an armful home. */
+const FIRE = {night:2, armful:2};
+const needs = () => ({food:2 - (S.built.granary ? 1 : 0) - (S.built.fields ? 1 : 0), water:S.built.well ? 1 : 2, wood:FIRE.night});
+// The moon is the real one. Within about a day of full, the whole valley is lit and the fire is not needed.
+const fullMoon = d => { const ph = ((new Date(d + 'T23:00').getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5 / 29.530588853) % 1; return Math.abs(ph - 0.5) < 0.04; };
 function note(text){ S.journal.unshift({d:today(), t:text}); S.journal = S.journal.slice(0, 30); }
 function addTrust(who, n){ S.trust[who] = Math.max(0, Math.min(10, S.trust[who] + n)); }
 
@@ -639,43 +643,50 @@ function addTrust(who, n){ S.trust[who] = Math.max(0, Math.min(10, S.trust[who] 
 function hash(s){ let h = 2166136261; for (const c of s){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 const addDays = (d, n) => new Date(new Date(d + 'T12:00').getTime() + n * 864e5).toLocaleDateString('en-CA');
 const taken = () => S.taken || (S.taken = {});
-const takenList = () => Object.keys(taken()).sort((a, b) => taken()[a] < taken()[b] ? -1 : 1);
+const lost = () => S.lost || (S.lost = {});
+// taken() is everyone missing from the fire. Those the Tallymen hold can be walked home; those the Unlit led away cannot, yet.
+const takenList = () => Object.keys(taken()).filter(k => !lost()[k]).sort((a, b) => taken()[a] < taken()[b] ? -1 : 1);
+const lostList = () => Object.keys(lost());
 const names = l => l.map(k => PEOPLE[k].name).join(' and ');
 const neglect = () => S.neglect || (S.neglect = {lastHelp:today(), stage:0, restUntil:'', rests:2});
-const helpBase = () => { const N = neglect(); return N.restUntil > N.lastHelp ? N.restUntil : N.lastHelp; };
 const resting = () => neglect().restUntil >= today();
-function neglectStep(stage, t){
-  if (stage === 1){ addTrust('dack', -1); note('Two Tallymen scouts sat on the ridge all day, counting the people around the fire. You were not among them.' + (taken().dack ? '' : ' Dack has not put his bow down since.')); return; }
-  if (stage === 2){ addTrust('maren', -1); addTrust('isla', -1); note('Someone cut a tally mark into the longhouse door in the night. Maren says that is how they mark a camp with nobody left to guard it. One more day like this and they come.'); return; }
-  const free = ['pip', 'oona', 'dack'].filter(k => !taken()[k]);
-  if (!free.length){
-    S.stock.food = Math.floor(S.stock.food / 2); S.stock.water = Math.floor(S.stock.water / 2);
-    note('The Tallymen came back and you were not here. There was nobody left worth taking, so they took half the food and water instead.'); return;
+const fireLit = () => S.stock.wood >= FIRE.night || resting() || fullMoon(today());
+function fireStep(stage, t){
+  if (stage === 1){ addTrust('dack', -1); note('The fire burned down to coals before morning. Something stood at the edge of what light was left and watched until dawn. Tobiah says they are only curious, so far. He also says nobody is to step into the shadows to look.'); return; }
+  if (stage === 2){ addTrust('maren', -1); addTrust('isla', -1); note('The fire was dead before dawn. Everyone shut themselves in the longhouse, because the Unlit will not go into a house. In the morning there were marks on the outside of the door that no hand made. Tobiah says one more dark night and they stop being curious.'); return; }
+  if (!lostList().length && !taken().dack){
+    lost().dack = t; taken().dack = t; addTrust('maren', -1); S.board = null;
+    if (S.offer && TASKS[S.offer.id].g === 'dack') S.offer = null;
+    if (openTalk === 'dack') openTalk = '';
+    note('A third night with no fire. Everyone went into the longhouse except Dack, who would not leave the gap unwatched. In the morning his bow was leaning there and he was not. Pip saw him walk off up the valley in the dark, following something that carried no light. Tobiah says the ones the Unlit lead away are not killed. They are kept somewhere. Nobody here knows where, or the way to it.');
+    return;
   }
-  const who = free[hash(t + S.first + stage) % free.length], n = PEOPLE[who].name;
-  taken()[who] = t; addTrust('maren', -1); S.board = null;
-  if (S.offer && TASKS[S.offer.id].g === who) S.offer = null;
-  if (openTalk === who) openTalk = '';
-  note('The Tallymen came at dusk and you were not here. They took ' + n + ' to their stockade as the share this camp owes. Maren has not sat down since. She wants ' + n + ' back.');
+  addTrust('maren', -1); addTrust('isla', -1);
+  note('The fire went out again. Nobody left the longhouse and nobody slept. In the morning the marks were on every doorpost.');
 }
-function runNeglect(t){
-  if (!S.home) return;
-  const N = neglect(), missed = dayDiff(helpBase(), t) - 1 - (S.built.walls ? 1 : 0);
-  const want = missed >= 6 ? 4 : missed >= 4 ? 3 : missed >= 3 ? 2 : missed >= 2 ? 1 : 0;
-  while (N.stage < want){ N.stage++; neglectStep(N.stage, t); }
+// One night of the fire. A lit night clears the count; a dark one moves the Unlit a step closer.
+function fireNight(lit, t){
+  const N = neglect();
+  if (lit){ N.dark = 0; N.stage = 0; return; }
+  N.dark = (N.dark || 0) + 1;
+  const want = N.dark - (S.built.walls ? 1 : 0);
+  if (want > N.stage){ N.stage = want; fireStep(want, t); }
 }
 function campState(){
-  const N = neglect(), t = today(), tk = takenList();
-  if (N.lastHelp === t && S.stats.tasks) return {mood:'Safe', line:'You carried for the camp today. The ridge is empty.', warn:''};
-  if (resting()) return {mood:'Resting', line:'Maren gave you leave. Nobody counts these days against you. Back to work after ' + new Date(N.restUntil + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) + '.', warn:''};
-  const m1 = dayDiff(helpBase(), t) - (S.built.walls ? 1 : 0);
-  const next = m1 === 2 ? 'Tallymen scouts will be on the ridge by morning' : m1 === 3 ? 'the Tallymen will mark the longhouse door tonight' : m1 === 4 || m1 === 6 ? 'the Tallymen will come tonight and take someone' : '';
-  const warn = next ? 'If you finish no task today, ' + next + '.' : '';
-  if (N.stage >= 3) return {mood:'Raided', line:tk.length ? 'The Tallymen hold ' + names(tk) + '. The camp is quiet in the wrong way.' : 'The Tallymen have been through here. Everyone is back, and nobody sleeps well.', warn};
-  if (N.stage === 2) return {mood:'Marked', line:'There is a tally mark cut into the longhouse door. They are coming.', warn};
-  if (N.stage === 1) return {mood:'Watched', line:'Tallymen scouts are on the ridge, counting heads.', warn};
+  const N = neglect(), t = today(), tk = takenList(), lo = lostList(), n = needs().wood, nights = Math.floor(S.stock.wood / n);
+  const moon = fullMoon(t), lit = fireLit();
+  const step = (N.dark || 0) + 1 - (S.built.walls ? 1 : 0);
+  const next = step < 1 ? 'The watch fire on the tower will hold them off for one night.' : step === 1 ? 'They will come down and stand at the edge of the camp.' : step === 2 ? 'They will come as far as the longhouse door.' : lo.length || taken().dack ? 'Nobody will sleep.' : 'This time the Unlit will lead someone away.';
+  const warn = !lit ? 'There is not enough wood to keep the fire through tonight. ' + next : !moon && !resting() && nights === 1 ? 'There is wood for tonight and no more.' : '';
+  if (resting()) return {mood:'Resting', line:'Maren gave you leave, and her people are keeping the fire. Back to work after ' + new Date(N.restUntil + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) + '.', warn:''};
+  if (N.stage >= 3) return {mood:'Dark', line:'The fire has been out three nights and more. The Unlit walk through the camp as they please.', warn};
+  if (N.stage === 2) return {mood:'Marked', line:'The fire died before dawn. There are marks on the longhouse door that no hand made.', warn};
+  if (N.stage === 1) return {mood:'Watched', line:'Something stood at the edge of the firelight last night and watched until dawn.', warn};
+  if (moon) return {mood:'Moonlit', line:'Full moon tonight. The whole valley is lit, and the Unlit keep to the tree line.', warn};
   if (tk.length) return {mood:'Grieving', line:'The Tallymen still hold ' + names(tk) + '.', warn};
-  return {mood:m1 >= 2 ? 'Uneasy' : 'Steady', line:m1 >= 2 ? 'They managed without you yesterday. They noticed.' : 'The fire is lit and everyone is accounted for.', warn};
+  if (lo.length) return {mood:'Grieving', line:names(lo) + ' was led away up the valley by the Unlit. His place at the fire is kept.', warn};
+  if (N.lastHelp === t && S.stats.tasks && lit) return {mood:'Safe', line:'You carried for the camp today. The fire will burn until morning.', warn};
+  return {mood:'Steady', line:'The fire is lit and everyone is accounted for.', warn};
 }
 /* How each villager is, and why. Every reason is something the game already knows, with a weight; the mood is their sum. */
 function reasonsFor(k){
@@ -690,9 +701,11 @@ function reasonsFor(k){
   if (arc && arc.failed){ if (k === 'isla') add(-2, 'You did not go for the feverbark when Wren needed it.'); if (k === 'tobiah') add(-3, 'He made the walk himself and will not walk again.'); }
   if (S.hungry) add(-2, 'The stores ran dry and everyone went short.');
   else if (k === 'maren'){ const n = needs(); ['water', 'food'].filter(r => n[r] > 0 && S.stock[r] < n[r] * 2).forEach(r => add(-1, 'There is ' + RES[r].toLowerCase() + ' for ' + (S.stock[r] < n[r] ? 'less than a day.' : 'one more day.'))); }
-  const tk = takenList().filter(o => o !== k), N = neglect();
+  const tk = takenList().filter(o => o !== k), lo = lostList().filter(o => o !== k), N = neglect();
   if (tk.length) add(-2, 'The Tallymen hold ' + names(tk) + '.');
-  else if (N.stage >= 1 && (k === 'dack' || k === 'maren')) add(-1, N.stage >= 2 ? 'There is a tally mark cut into the longhouse door.' : 'Tallymen scouts are on the ridge.');
+  if (lo.length) add(-2, names(lo) + ' was led away by the Unlit.');
+  if (N.stage >= 1) add(k === 'tobiah' || k === 'maren' ? -2 : -1, N.stage >= 2 ? 'The fire died before dawn and there are marks on the door.' : 'Something stood at the edge of the firelight last night.');
+  else if (!fireLit() && (k === 'tobiah' || k === 'maren')) add(-1, 'There is not wood enough to keep the fire through tonight.');
   if (N.lastHelp === today() && S.stats.tasks) add(1, 'You carried for the camp today.');
   if (k === 'tobiah' && roundCount(roundsToday()) >= ROUND.bonusAt) add(1, 'You walked your rounds today without being asked.');
   if (k === 'pip' && S.stepLog.date === today() && S.stepLog.steps >= 1000) add(1, S.stepLog.steps.toLocaleString() + ' steps notched on the tally stick today.');
@@ -749,7 +762,7 @@ const tallyHtml = y => `<ul class="why">${y.rows.map(r => `<li class="nil">${esc
 function takeRest(){
   const N = neglect(); if (N.rests < 1 || resting()) return;
   N.rests--; N.restUntil = addDays(today(), 1);
-  note('You told Maren you needed to rest. She looked at you for a while, then nodded. "Two days. Then I need you back."');
+  note('You told Maren you needed to rest. She looked at you for a while, then nodded. "Two days. We will keep the fire. Then I need you back."');
   save(); render();
 }
 function makeBoard(t){
@@ -763,8 +776,17 @@ function newDay(){
     if (S.dayStart && S.dayStart.date === S.seen && S.recapSeen !== S.seen){ const y = tally(); if (y && !y.quiet) S.missed = y; else delete S.missed; }
     const days = Math.min(3, Math.max(1, dayDiff(S.seen, t))), n = needs();
     let dry = false;
-    for (let i = 0; i < days; i++) for (const k in n){ S.stock[k] -= n[k]; if (S.stock[k] < 0){ S.stock[k] = 0; if (k !== 'wood') dry = true; } }
-    if (dry && !S.hungry){ note('The stores ran dry overnight. Nobody said your name, but Dack looked at you when the pot came up empty.'); addTrust('dack', -1); }
+    for (let i = 0; i < days; i++){
+      // On rest days Maren's people keep the fire, and under a full moon it is not needed, so neither night burns your wood.
+      const night = addDays(t, i - days), free = neglect().restUntil >= night || fullMoon(night);
+      let lit = true;
+      for (const k in n){
+        if (k === 'wood' && free) continue;
+        S.stock[k] -= n[k]; if (S.stock[k] < 0){ S.stock[k] = 0; if (k === 'wood') lit = false; else dry = true; }
+      }
+      if (S.home) fireNight(lit, t);
+    }
+    if (dry && !S.hungry){ note('The stores ran dry overnight. Nobody said your name, but ' + (taken().dack ? 'Maren' : 'Dack') + ' looked at you when the pot came up empty.'); addTrust(taken().dack ? 'maren' : 'dack', -1); }
     S.hungry = dry; S.seen = t; S.last = null;
   }
   if (S.fever && !S.fever.done && !S.fever.failed && dayDiff(S.fever.start, t) >= S.fever.days){
@@ -774,7 +796,10 @@ function newDay(){
       note('You did not go. Tobiah made the walk to Low Fennick himself and came back on a litter. Wren will live. He will not walk again, and Isla does not look at you.');
     }
   }
-  runNeglect(t);
+  if (S.home && !S.valleyTold){
+    S.valleyTold = t;
+    note('Tobiah told it at the fire, because you asked why nobody else lives up here. He was a boy in this valley. It emptied in one winter and the river towns have called it forbidden ever since. That is why he led everyone here: the Tallymen will not follow. What emptied it he calls the Unlit. They stand at the edge of any light and will not step into it. They will not go into a house. Under a full moon you can walk anywhere. So the fire burns all night, every night, and nobody steps into the shadows.');
+  }
   if (!S.board || S.board.date !== t) makeBoard(t);
   if (!S.fever && standing() >= 5){
     S.fever = {start:t, days:3, done:false, failed:false};
@@ -1102,6 +1127,7 @@ function unload(){
     { const extra = kit(i => i.bonus && i.bonus[0] === T.res).reduce((n, i) => n + i.bonus[1], 0) + (S.built.smithy ? 1 : 0); if (extra){ haul += extra; notes.push('Your tools brought in ' + extra + ' more'); } }
     S.stock[T.res] += haul; addTrust(T.g, tr);
   }
+  if (T.res !== 'wood'){ S.stock.wood += FIRE.armful; notes.push('You picked up an armful of deadfall on the way in, enough for tonight\'s fire'); }
   let got = null;
   if (m.item && !items().includes(m.item)){
     got = item(m.item); items().push(got.k);
@@ -1110,7 +1136,7 @@ function unload(){
     note('You brought home a find: ' + got.name.toLowerCase() + '. ' + got.does);
   }
   if (!T.rescue) S.board.done[m.id] = true;
-  { const N = neglect(); N.lastHelp = today(); N.stage = 0; }
+  { const N = neglect(); N.lastHelp = today(); N.stage = 0; N.dark = 0; }
   const steps = Math.round(m.meters / 0.78);
   S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
   S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag, item:got ? got.k : null};
@@ -1360,10 +1386,10 @@ async function askAI(rules, turns, wantJson){
 }
 function worldBrief(){
   const arc = S.fever && !S.fever.done && !S.fever.failed ? `The infant Wren has a dangerous fever. Feverbark from the village of Low Fennick would cure it, and ${feverLeft()} day(s) remain.` : S.fever && S.fever.failed ? 'The Stranger failed to fetch feverbark in time. Tobiah made the walk himself and can no longer walk at all. Wren lived.' : S.fever && S.fever.done ? 'The Stranger fetched the feverbark that broke the infant Wren\'s fever.' : '';
-  return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They camp at a ruined waystation called Hollow Ash: one longhouse, a fire, few stores. The Tallymen hold the crossings and commons and take a share from every settlement.
+  return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They escaped into what the river towns call the forbidden valley and camp at a ruined waystation there called Hollow Ash: one longhouse, a fire, few stores. The Tallymen hold the crossings and commons at the valley mouth and take a share from every settlement, but they will not come into the valley itself. The valley has been deserted for a lifetime because of the Unlit: spirits that come down at night. They stand at the edge of any light and will not step into it, they will not go inside a house, and under a full moon it is safe to walk anywhere. So far they only seem curious, but people who step into the shadows at night are led away and not seen again, so everyone stays in the light. The camp keeps a fire burning all night, every night, which eats a great deal of wood. Tobiah lived in this valley as a boy before it emptied; he led the others here and remembers some of the old tricks for keeping the Unlit off, the all-night fire first among them. He does not know everything and says so. Nobody knows what the Unlit are.
 The player is "the Stranger", who fell out of thin air from another world (ours), out of shape and wearing Crocs, on top of one of two Tallymen who had caught Maren and Pip on the valley road. Maren took that man's cloak for him and gave him a rope, a belt knife and a waterskin, and they escaped up to Hollow Ash; Pip saw him fall and has counted his steps on a stolen tally stick ever since. He carries a dead phone, a house key and a TV remote from his world. Maren has told him the broken arch at Hollow Ash is the door his kind come through, long dead, and the only way he could ever be sent home. He is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
-The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
-Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the longhouse'}. What the Stranger has noticed about the old empire so far: ${frags().slice(-3).map(findText).join(' ') || 'nothing yet'} Nobody in camp can read the old writing or explain these things. They are uneasy about them, do not invent explanations, and would rather talk about the work. Inside the longhouse, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade, taken in a raid after the Stranger stayed away from the work for days. The camp is frightened and wants them back.' : neglect().stage ? ' The Stranger has stayed away from the work for days and Tallymen scouts are watching the camp.' : ''}`;
+The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee, the elder who was a boy in this valley), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
+Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the longhouse'}. What the Stranger has noticed about the old empire so far: ${frags().slice(-3).map(findText).join(' ') || 'nothing yet'} Nobody in camp can read the old writing or explain these things. They are uneasy about them, do not invent explanations, and would rather talk about the work. Inside the longhouse, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade at the valley mouth. The camp wants them back.' : ''}${lostList().length ? ' ' + names(lostList()) + ' was led away up the valley by the Unlit after the fire went out three nights running. Tobiah believes he is alive and kept somewhere. Nobody knows where or how to get him back, and nobody should invent a way.' : ''}${neglect().stage ? ' The night fire has gone out ' + (neglect().dark || 1) + ' night(s) running for lack of wood, and the Unlit are coming closer.' : !fireLit() ? ' There is not enough wood for tonight\'s fire and everyone knows it.' : ''}${fullMoon(today()) ? ' Tonight is a full moon.' : ''}`;
 }
 function charRules(k){
   const p = PEOPLE[k], t = S.trust[k];
@@ -1646,8 +1672,8 @@ function render(){
         <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p>${L.frag != null ? `<div class="frag"><p class="eyebrow">${String(L.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(L.frag))}</p></div>` : ''}${L.item && item(L.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(L.item).name)}.</b> ${esc(item(L.item).found)}</p><p class="small">${item(L.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(L.item).who].name + '. '}${esc(item(L.item).does)}</p></div>` : ''}</div>`;
     }
     const arc = S.fever && !S.fever.done && !S.fever.failed, tk = takenList(), CS = campState();
-    h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${tk.length ? 'The Tallymen have ' + names(tk) : arc ? 'Wren is burning up' : CS.mood === 'Marked' ? 'There is a mark on the longhouse door' : CS.mood === 'Watched' ? 'Scouts on the ridge' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2>
-      ${CS.warn || ['Watched', 'Marked', 'Raided'].includes(CS.mood) ? `<p class="small alarm">${CS.line} ${CS.warn || ''} Finishing any task keeps the Tallymen away.</p>` : ''}<ul class="tasks">`;
+    h += `<p class="eyebrow">The board, day ${dayDiff(S.first, today()) + 1}</p><h2>${tk.length ? 'The Tallymen have ' + names(tk) : arc ? 'Wren is burning up' : CS.mood === 'Dark' ? 'The fire is out' : CS.mood === 'Marked' ? 'Marks on the longhouse door' : CS.mood === 'Watched' ? 'Something at the edge of the light' : CS.warn ? 'The woodpile is low' : S.hungry ? 'The pot came up empty' : 'What the camp needs from you'}</h2>
+      ${CS.warn || ['Watched', 'Marked', 'Dark'].includes(CS.mood) ? `<p class="small alarm">${CS.line} ${CS.warn || ''} Any walk you finish brings home wood for the fire.</p>` : ''}<ul class="tasks">`;
     if (tk.length) h += taskRow('rescue', true);
     if (arc) h += taskRow('fever', true);
     S.board.ids.forEach(id => h += taskRow(id, false));
@@ -1765,7 +1791,7 @@ function renderCamp(){
   $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small>${n0[k] > 0 ? `<em>${Math.floor(S.stock[k] / n0[k]) === 1 ? '1 day' : Math.floor(S.stock[k] / n0[k]) + ' days'}</em>` : ''}</div>`).join('');
   { const sp = SPOTS.find(s => s.k === openSpot) || SPOTS[0], stage = villageStage(), box = $('spotBox');
     const face = who => pic('p-' + who, 'face sm');
-    const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. The Tallymen have ' + PEOPLE[who].name + '.' : hurt}</span>`;
+    const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. ' + (lost()[who] ? 'The Unlit led ' + PEOPLE[who].name + ' away.' : 'The Tallymen have ' + PEOPLE[who].name + '.') : hurt}</span>`;
     const jobs = spotJobs(sp.k).map(b => {
       if (S.built[b.k]) return `<li class="ok"><div class="thead">${face(b.who)}<div class="who"><h3>${b.name}</h3><span class="built">Built</span></div></div><p class="small">${b.good}</p><p class="cost">${b.perk}</p></li>`;
       const why = blocked(b), can = canPay(b.cost);
@@ -1827,11 +1853,11 @@ function renderCamp(){
   $('place').innerHTML = `<dt>Standing</dt><dd class="num">${RANKS[r][1]}, ${standing()} trust${next ? '. ' + (next[0] - standing()) + ' more to ' + next[1] : ''}</dd><dt>You sleep</dt><dd>${sleep()}</dd><dt>You eat</dt><dd>${rations()}</dd><dt>You carry</dt><dd class="num">${carryName()}, ${carry()} a trip</dd><dt>The camp</dt><dd><b>${CS.mood}.</b> ${CS.line}</dd>`;
   { const N = neglect();
     $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with Maren\'s leave' : 'Tell Maren you need two rest days (' + N.rests + ' banked)'}</button>
-      <p class="small muted">The camp needs one finished task every other day. Miss more than that and the Tallymen notice: first scouts, then a mark on the door, then they take someone. Rest days do not count against you, and you earn another for every five tasks.</p>`;
+      <p class="small muted">The fire has to burn all night, and it eats ${needs().wood} firewood doing it. Any walk you finish brings home enough for one night. Let it go dark and the Unlit come closer each night: first to the edge of the camp, then to the door, then someone is led away. On rest days Maren's people keep the fire for you, and you earn another rest for every five tasks.</p>`;
     $('restBtn').onclick = takeRest; }
   $('people').innerHTML = Object.entries(PEOPLE).filter(([k]) => k === openPerson).map(([k, p]) => {
     const t = S.trust[k], tier = t >= 7 ? 2 : t >= 3 ? 1 : 0, line = p.lines[tier][(talkIdx[k] || 0) % 2], open = aiOn() && openTalk === k, md = moodOf(k);
-    if (taken()[k]) return `<li class="gone"><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3></div><span class="small muted">${p.role}</span></div></div><span class="say">Taken by the Tallymen. ${p.name} is held in their stockade until you bring them back.</span></li>`;
+    if (taken()[k]) return `<li class="gone"><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3></div><span class="small muted">${p.role}</span></div></div><span class="say">${lost()[k] ? 'Led away by the Unlit, up the valley in the dark. Tobiah says the ones they take are kept, not killed. Nobody here knows the way yet.' : 'Taken by the Tallymen. ' + p.name + ' is held in their stockade until you bring them back.'}</span></li>`;
     return `<li><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3><span class="pips" role="img" aria-label="Trust ${t} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</span></div>
       <span class="small muted">${p.role}</span></div></div>
       <div class="mood ${md.tone}">${md.word[0].toUpperCase() + md.word.slice(1)}</div>
@@ -1852,7 +1878,7 @@ function renderCamp(){
   }
   const n = needs();
   $('stock').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n[k] && S.stock[k] < n[k] * 2 ? 'low' : ''}"><div class="count">${S.stock[k]}</div><span class="small muted">${name}</span></div>`).join('');
-  $('upkeep').textContent = `Each day the camp uses ${n.food} food, ${n.water} water and ${n.wood} firewood, whether you show up or not.`;
+  $('upkeep').textContent = `Each day the camp uses ${n.food} food and ${n.water} water, and each night the fire burns ${n.wood} firewood, whether you show up or not.`;
   $('builds').innerHTML = [...STAGED, ...BUILDS.filter(b => b.side)].map(b => {
     const why = blocked(b), where = SPOTS.find(s => s.k === b.spot).name;
     return `<li><div><b>${b.name}</b> <span class="tag">${where}</span><div class="small">${b.perk}</div><div class="cost">${costText(b.cost)}${why && b === nextBuild() ? '. ' + why : ''}</div></div>` +
@@ -1872,13 +1898,13 @@ function renderCamp(){
   $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
   renderStepLink();
-  { const CS2 = campState(), w = $('campWarn'), alarm = CS2.warn || ['Watched', 'Marked', 'Raided'].includes(CS2.mood);
-    w.hidden = !alarm; w.textContent = alarm ? CS2.line + ' ' + (CS2.warn || '') + ' Finishing any task keeps the Tallymen away.' : '';
+  { const CS2 = campState(), w = $('campWarn'), alarm = CS2.warn || ['Watched', 'Marked', 'Dark'].includes(CS2.mood);
+    w.hidden = !alarm; w.textContent = alarm ? CS2.line + ' ' + (CS2.warn || '') + ' Any walk you finish brings home wood for the fire.' : '';
     const waiting = asks(), a = waiting[0];
     $('askBox').innerHTML = a ? `<button class="bare ask" id="askGo">${pic('p-' + a.who, 'face sm')}<span><h3>${PEOPLE[a.who].name} is asking for you</h3><span class="small muted">${esc(a.t)}. ${esc(a.sub)}</span></span></button>` : `<p class="small muted">Nobody is asking anything of you just now. ${esc(CS2.line)}</p>`;
     if ($('askGo')) $('askGo').onclick = () => { sheet = ''; showTab('walk'); window.scrollTo(0, 0); };
     $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
-      return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? 'taken by the Tallymen' : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? 'taken' : m.word}</em></button>`; }).join('');
+      return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? (lost()[k] ? 'led away by the Unlit' : 'taken by the Tallymen') : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? (lost()[k] ? 'gone' : 'taken') : m.word}</em></button>`; }).join('');
     $('fire').querySelectorAll('button').forEach(b => b.onclick = () => openPersonSheet(b.dataset.person));
     const rows = [], nr = REPAIRS.find(r => !S.fixed[r.k]), nb = nextBuild();
     if (nr) rows.push(['house', nr.bad]);
