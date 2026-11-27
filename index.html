@@ -1524,7 +1524,7 @@ let sampleFn = null, apiKey = store.get('lwb-key') || '', model = store.get('lwb
    hour of today; the game picks it up from there whenever it is opened. The code is this phone's own and is kept only here. */
 let tallyOpen = false;
 let stepCode = store.get('lwb-steps-code') || '', stepLink = {busy:false, msg:'', at:+store.get('lwb-steps-at') || 0};
-const stepUrl = () => PUSH_URL + '/steps/' + stepCode + '?total=';
+const stepUrl = () => PUSH_URL + '/steps/' + stepCode + '?hours=';
 async function stepsCall(path){
   let endpoint; try { const sub = pushCapable() ? await pushSub() : null; if (sub) endpoint = sub.endpoint; } catch {}
   const r = await fetch(PUSH_URL + path, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({code:stepCode, endpoint, tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
@@ -1566,12 +1566,19 @@ const stepHelp = () => `<p class="small muted">One shortcut in the iPhone Shortc
   <p class="small muted">Keep this link to yourself. Anyone who has it could send a step count in your name, and nothing more.</p>
   <ol>
   <li>Tap Copy above. Then open Shortcuts, tap +, and name the new shortcut Glim count.</li>
-  <li>Add the action Find Health Samples. Set Type to Steps and add the filter Start Date is today. Leave the rest alone.</li>
-  <li>Add Calculate Statistics and set it to Sum.</li>
-  <li>Add a URL action. Paste the link, and put the Calculation Result bubble right after the equals sign at its end, with no space.</li>
-  <li>Add Get Contents of URL. That is the whole shortcut: four actions.</li>
+  <li>Add the action Find Health Samples. Set Type to Steps. Add the filter Start Date is today. Set Group By to Hour and Sort By to Start Date.</li>
+  <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen.</li>
+  <li>Below End Repeat add Combine Text, with Custom separator <b>_</b> (an underscore).</li>
+  <li>Add a URL action. Paste the link, and put the Combined Text right after the equals sign at its end.</li>
+  <li>Add Get Contents of URL.</li>
   <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here: your glim should have your steps.</li>
-  <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Glim count. Add one for each hour you want counted. Your glim credits the steps to the hour the shortcut runs in, so an hour with no run is not counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>`;
+  <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Glim count. Add one for each hour you want counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>
+  <details class="lochelp"><summary>A shorter shortcut, if that one is a struggle</summary><ol>
+  <li>Four actions and no Repeat. Add Find Health Samples with Type Steps and the filter Start Date is today. Leave the rest alone.</li>
+  <li>Add Calculate Statistics and set it to Sum.</li>
+  <li>Add a URL action. Paste the link, change <b>hours=</b> at its end to <b>total=</b>, and put the Calculation Result bubble right after the equals sign.</li>
+  <li>Add Get Contents of URL. Run it once, then set the hourly automation as above.</li>
+  <li>The catch: your glim credits the steps to the hour the shortcut runs in, so an hour with no run is not counted on its own.</li></ol></details>`;
 function renderStepLink(){
   const box = $('stepLink'); if (!box) return;
   if (!PUSH_URL){ box.hidden = true; return; }
