@@ -1913,8 +1913,9 @@ function renderCamp(){
   $('life').innerHTML = `<div><b>${fmtDist(S.stats.meters)}</b><span class="small muted">on foot</span></div><div><b>${S.stats.tasks}</b><span class="small muted">tasks done</span></div><div><b>${S.stats.wins}</b><span class="small muted">fights won</span></div>`;
   $('ideaPanel').hidden = !aiOn();
   if (!$('ideaWho').options.length) $('ideaWho').innerHTML = Object.entries(PEOPLE).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('');
-  $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : relayOn ? 'The villagers can talk back. Tap anyone at the fire on the Camp screen to talk to them. There is a daily limit on how much they will say, shared by everyone who plays. You do not need a key of your own.' : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
-  $('keyBox').hidden = !!sampleFn; $('keyClear').hidden = !apiKey; $('modelSel').value = model;
+  $('aiStatus').textContent = sampleFn ? 'The villagers speak through your Claude app. This uses your own Claude usage, and Claude asks your permission the first time.' : apiKey ? 'The villagers speak through your API key. Tap Talk on anyone to speak with them.' : relayOn ? 'The villagers can talk back. Tap anyone at the fire on the Camp screen to talk to them. There is a daily limit on how much they will say, shared by everyone who plays.' : 'The villagers keep to their written lines. Add a Claude API key to let them talk back and to pitch them ideas from your world.';
+  $('keyBox').hidden = !!sampleFn || (relayOn && !apiKey);   // with the shared voice on, only someone who already saved a key sees the key box
+  $('keyClear').hidden = !apiKey; $('modelSel').value = model;
   $('unitBtn').textContent = units === 'mi' ? 'Switch to kilometres' : 'Switch to miles';
   $('moveHome').hidden = !S.home || !!S.mission;
 }
