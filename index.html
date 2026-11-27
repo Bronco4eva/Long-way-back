@@ -232,13 +232,13 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
       <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem">
         <h3>Ask your glim</h3>
-        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a doot, the same doot it makes when you take a step. Two doots with the second one higher is yes. Two with the second one lower is no. Two the same means it does not know. Turn your ring switch on to hear it.</p>
+        <p class="small muted">It has no words yet. Ask it something it can answer with yes or no, and listen. Its one sound is a doot, the same doot it makes when you take a step. Two doots with the second one higher is yes. Two with the second one lower is no. Three doots are the soft answers: the last one higher is maybe, the last one lower means it is not sure. Turn your ring switch on to hear it.</p>
         <div class="row">
           <input class="grow" style="flex-basis:8rem" type="text" id="glimAsk" maxlength="200" placeholder="Is Pip all right?">
           <button id="glimAskBtn">Ask</button>
         </div>
         <p class="small" id="glimAns" aria-live="polite"></p>
-        <div class="row"><button class="quiet" data-tone="step">Hear a step</button><button class="quiet" data-tone="yes">Hear yes</button><button class="quiet" data-tone="no">Hear no</button><button class="quiet" data-tone="unsure">Hear unsure</button></div>
+        <div class="row"><button class="quiet" data-tone="step">Hear a step</button><button class="quiet" data-tone="yes">Hear yes</button><button class="quiet" data-tone="no">Hear no</button><button class="quiet" data-tone="maybe">Hear maybe</button><button class="quiet" data-tone="unsure">Hear unsure</button></div>
       </div>
       <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
@@ -1015,11 +1015,11 @@ function glimTone(kind){
     doot(B.step, t0, kind === 'step' ? .3 : .4);
     if (kind === 'yes') doot(B.up, t0 + B.gap);
     else if (kind === 'no') doot(B.down, t0 + B.gap);
-    else if (kind === 'unsure') doot(B.step, t0 + B.gap, .25);
+    else if (kind === 'maybe' || kind === 'unsure'){ doot(B.step, t0 + B.gap); doot(kind === 'maybe' ? B.up : B.down, t0 + B.gap * 2); }
   } catch {}
 }
 const GLIM_DOOT = {step:587.3, up:784, down:440, gap:.2};
-const GLIMSAY = {step:'Doot. One step.', yes:'Doot, doot, the second one higher. Yes.', no:'Doot, doot, the second one lower. No.', unsure:'Doot, doot, both the same. It does not know.'};
+const GLIMSAY = {step:'Doot. One step.', yes:'Doot, doot, the second one higher. Yes.', no:'Doot, doot, the second one lower. No.', maybe:'Doot, doot, doot, the last one higher. Maybe.', unsure:'Doot, doot, doot, the last one lower. It is not sure.'};
 let glimBusy = false;
 async function askGlim(){
   const q = $('glimAsk').value.trim(), out = $('glimAns'); if (!q || glimBusy) return;
@@ -1030,8 +1030,8 @@ async function askGlim(){
   try {
     const r = String(await askAI(worldBrief() + `
 
-The Stranger is asking a question of the glim at their shoulder. The glim is a small, loyal, living light. It has no words. It can only answer yes, no, or that it does not know. Answer truthfully from the facts above, or from how a small light that loves walking and fears the dark would feel. Reply with exactly one word: yes, no, or unsure. Say unsure when the facts above do not settle it and it is not a matter of the glim's own feeling, and for anything that is not a yes or no question.`, [{role:'user', content:q.slice(0, 200)}], false)).toLowerCase();
-    a = /\byes\b/.test(r) ? 'yes' : /\bno\b/.test(r) ? 'no' : 'unsure';
+The Stranger is asking a question of the glim at their shoulder. The glim is a small, loyal, living light. It has no words. It can only answer yes, no, maybe, or that it is not sure. Answer truthfully from the facts above, or from how a small light that loves walking and fears the dark would feel. Reply with exactly one word: yes, no, maybe, or unsure. Say maybe when the facts lean toward yes without settling it. Say unsure when the facts above do not settle it at all and it is not a matter of the glim's own feeling, and for anything that is not a yes or no question.`, [{role:'user', content:q.slice(0, 200)}], false)).toLowerCase();
+    a = /\bmaybe\b/.test(r) ? 'maybe' : /\bunsure\b/.test(r) ? 'unsure' : /\byes\b/.test(r) ? 'yes' : /\bno\b/.test(r) ? 'no' : 'unsure';
   } catch (e){ out.textContent = aiErr(e); glimBusy = false; $('glimAskBtn').disabled = false; return; }
   glimTone(a); out.textContent = GLIMSAY[a]; glimBusy = false; $('glimAskBtn').disabled = false;
 }
