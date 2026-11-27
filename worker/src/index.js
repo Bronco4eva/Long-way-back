@@ -34,8 +34,8 @@ export async function takeSteps(env, code, text, now = Date.now()){
 }
 
 // Villager voices for players who have no key of their own. The key is a secret on this server (ANTHROPIC_API_KEY)
-// and never reaches a phone. Caps are counted per day against a scrambled internet address; no words are stored.
-const TALK = {perPlayer:40, everyone:400, maxSystem:16000, maxTurns:30, maxTurnChars:2000, maxTokens:2000, model:'claude-opus-5-5'};
+// and never reaches a phone. Caps are counted per day against a scrambled form of the player's own code; no words are stored.
+const TALK = {everyone:400, maxSystem:24000, maxTurns:30, maxTurnChars:2000, maxTokens:2000, model:'claude-opus-5-5'};
 
 const LINES = [
   'You have been down a whole hour. Up. Once round the camp.',
@@ -142,28 +142,67 @@ function validTalk(j){
     && Array.isArray(j.messages) && j.messages.length > 0 && j.messages.length <= TALK.maxTurns
     && j.messages.every(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.length > 0 && m.content.length <= TALK.maxTurnChars);
 }
-async function callClaude(env, j, withFallback){
+
+// The story that grows around one player. The game writes the request and referees whatever comes back; this server
+// only fixes the shape of the answer, so a story turn can never be anything but these fields.
+const text = max => ({type:'string', description:'At most ' + max + ' characters.'});
+const STORY = {
+  turn:{effort:'medium', maxTokens:6000, schema:{type:'object', additionalProperties:false,
+    required:['who', 'scene', 'line', 'thread', 'move', 'favour_title', 'favour_ask', 'favour_res', 'favour_far'],
+    properties:{who:{type:'string'}, scene:text(420), line:text(220), thread:text(200), move:{type:'string', enum:['none', 'favour']},
+      favour_title:text(40), favour_ask:text(200), favour_res:{type:'string', enum:['none', 'wood', 'water', 'food', 'stone', 'fiber', 'herbs']}, favour_far:{type:'boolean'}}}},
+  recall:{effort:'low', maxTokens:3000, schema:{type:'object', additionalProperties:false, required:['notes', 'about'],
+    properties:{notes:{type:'array', items:{type:'string'}}, about:{type:'array', items:{type:'string'}}}}}
+};
+// What a player may use in a day. Nothing sets a plan yet: a paid plan is one stored line, "plan:<player>" = "paid",
+// which a payment page can write later. Until then everyone is on "free".
+const PLANS = {free:{talk:40, story:12}, paid:{talk:200, story:40}};
+const playerOk = codeOk;
+// One record per player per month: today's counts, the month's counts and the month's tokens. No words are stored.
+async function meter(request, env, j){
+  const now = day(), month = now.slice(0, 7), ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const who = playerOk(j && j.player) ? 'p' + hex(await crypto.subtle.digest('SHA-256', enc.encode('player|' + j.player))).slice(0, 24)
+    : 'i' + hex(await crypto.subtle.digest('SHA-256', enc.encode(month + '|' + ip))).slice(0, 24);   // a page from before players had a code
+  const key = 'use:' + month + ':' + who;
+  const [was, planName] = await Promise.all([env.SUBS.get(key, 'json'), env.SUBS.get('plan:' + who)]);
+  const rec = Object.assign({d:now, talk:0, story:0, m:{talk:0, story:0, in:0, out:0}}, was || {});
+  if (rec.d !== now){ rec.d = now; rec.talk = 0; rec.story = 0; }
+  const plan = PLANS[planName] ? planName : 'free';
+  const limit = {...PLANS[plan]};
+  if (plan === 'free'){ if (+env.TALK_PER_PLAYER) limit.talk = +env.TALK_PER_PLAYER; if (+env.STORY_PER_PLAYER) limit.story = +env.STORY_PER_PLAYER; }
+  return {key, rec, plan, limit};
+}
+const usageOf = u => ({plan:u.plan, today:{talk:u.rec.talk, story:u.rec.story}, limit:u.limit, month:u.rec.m});
+
+async function callClaude(env, j, withFallback, shape){
   const headers = {'content-type':'application/json', 'x-api-key':env.ANTHROPIC_API_KEY, 'anthropic-version':'2026-10-21'};
-  const body = {model:env.TALK_MODEL || TALK.model, max_tokens:TALK.maxTokens, system:j.system, messages:j.messages.map(m => ({role:m.role, content:m.content})), output_config:{effort:'low'}};
+  const body = {model:env.TALK_MODEL || TALK.model, max_tokens:shape ? shape.maxTokens : TALK.maxTokens, system:j.system, messages:j.messages.map(m => ({role:m.role, content:m.content})),
+    output_config:shape ? {effort:shape.effort, format:{type:'json_schema', schema:shape.schema}} : {effort:'low'}};
   // If a safety check declines a request, let Anthropic hand it to another model instead of failing.
   if (withFallback){ headers['anthropic-beta'] = 'server-side-fallback-2026-07-01'; body.fallbacks = 'default'; }
   return fetch('https://api.anthropic.com/v1/messages', {method:'POST', headers, body:JSON.stringify(body)});
 }
-export async function talk(request, env, j){
+// kind is 'talk' (a villager answers) or 'story' (a story turn, or a villager's memory of the player being written down).
+export async function talk(request, env, j, kind = 'talk'){
   if (!env.ANTHROPIC_API_KEY) return [{error:'no_key'}, 503];
-  if (!validTalk(j)) return [{error:'bad request'}, 400];
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown', d = day();
-  const mine = 'talk:' + d + ':' + hex(await crypto.subtle.digest('SHA-256', enc.encode(d + '|' + ip))).slice(0, 24), all = 'talk:' + d + ':all';
-  const [nMine, nAll] = (await Promise.all([env.SUBS.get(mine), env.SUBS.get(all)])).map(v => +v || 0);
-  if (nMine >= (+env.TALK_PER_PLAYER || TALK.perPlayer) || nAll >= (+env.TALK_EVERYONE || TALK.everyone)) return [{error:'daily_cap'}, 429];
-  await Promise.all([env.SUBS.put(mine, String(nMine + 1), {expirationTtl:2 * 86400}), env.SUBS.put(all, String(nAll + 1), {expirationTtl:2 * 86400})]);
-  let r = await callClaude(env, j, true);
-  if (r.status === 400) r = await callClaude(env, j, false);   // in case the fallback option is not accepted
+  const shape = kind === 'story' ? STORY[j && j.kind] : null;
+  if (!validTalk(j) || (kind === 'story' && !shape)) return [{error:'bad request'}, 400];
+  const u = await meter(request, env, j), all = 'talk:' + u.rec.d + ':all';
+  const nAll = +(await env.SUBS.get(all)) || 0;
+  if (u.rec[kind] >= u.limit[kind]) return [{error:'daily_cap', mine:true, usage:usageOf(u)}, 429];
+  if (nAll >= (+env.TALK_EVERYONE || TALK.everyone)) return [{error:'daily_cap', usage:usageOf(u)}, 429];
+  // Counted before the call, so a burst cannot run past the caps while Claude is still answering.
+  u.rec[kind]++; u.rec.m[kind]++;
+  await Promise.all([env.SUBS.put(u.key, JSON.stringify(u.rec), {expirationTtl:70 * 86400}), env.SUBS.put(all, String(nAll + 1), {expirationTtl:2 * 86400})]);
+  let r = await callClaude(env, j, true, shape);
+  if (r.status === 400) r = await callClaude(env, j, false, shape);   // in case the fallback option is not accepted
   if (r.status === 401 || r.status === 403) return [{error:'server_key_rejected'}, 502];
   if (r.status === 429 || r.status === 529) return [{error:'busy'}, 503];
   if (!r.ok) return [{error:'upstream_error'}, 502];
   const out = await r.json();
-  return [{stop_reason:out.stop_reason, content:(out.content || []).filter(b => b.type === 'text').map(b => ({type:'text', text:b.text}))}, 200];
+  // Story turns are few and long, so their size is worth the one extra write; it is what a plan would be priced on.
+  if (kind === 'story' && out.usage){ u.rec.m.in += out.usage.input_tokens || 0; u.rec.m.out += out.usage.output_tokens || 0; await env.SUBS.put(u.key, JSON.stringify(u.rec), {expirationTtl:70 * 86400}); }
+  return [{stop_reason:out.stop_reason, content:(out.content || []).filter(b => b.type === 'text').map(b => ({type:'text', text:b.text})), usage:usageOf(u)}, 200];
 }
 
 function reply(body, status, origin){
@@ -190,7 +229,8 @@ export default {
     if (origin !== GAME_ORIGIN) return reply({error:'only the game may call this'}, 403, origin);
     let j; try { j = await request.json(); } catch { return reply({error:'bad request'}, 400, origin); }
 
-    if (url.pathname === '/talk'){ const [body, status] = await talk(request, env, j); return reply(body, status, origin); }
+    if (url.pathname === '/talk' || url.pathname === '/story'){ const [body, status] = await talk(request, env, j, url.pathname.slice(1)); return reply(body, status, origin); }
+    if (url.pathname === '/usage') return reply(usageOf(await meter(request, env, j)), 200, origin);
 
     if (url.pathname === '/subscribe'){
       if (!validSub(j.sub) || !hourOk(j.from) || !hourOk(j.to) || j.from >= j.to || localHour(String(j.tz)) < 0) return reply({error:'bad request'}, 400, origin);
