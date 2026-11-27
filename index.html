@@ -66,6 +66,10 @@ button.bare{border:0;border-radius:0;padding:0;min-height:0;text-align:left;back
 .fire em{font-style:normal;font-size:.6875rem;line-height:1.15;color:var(--muted)}.fire em.bad{color:var(--warn)}.fire em.good{color:var(--moss)}
 .fire i{position:absolute;left:-4px;top:-4px;width:12px;height:12px;background:var(--ember);border:2px solid var(--bg)}
 .fire .gone .face{filter:grayscale(1) brightness(.45)}
+.glim{--b:.5;flex:none;display:inline-block;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#fff8dc 0,#ffd47a 14%,rgba(255,170,70,calc(.15 + var(--b)*.6)) 30%,rgba(255,150,60,0) 68%);opacity:calc(.45 + var(--b)*.55);animation:glim 3.2s ease-in-out infinite}
+.glim.big{width:84px;height:84px}
+@keyframes glim{50%{transform:translateY(-3px) scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.glim{animation:none}}
 .pack{display:flex;flex-direction:column}
 .pack button{display:flex;justify-content:space-between;gap:12px;align-items:center;width:100%;border-top:2px solid var(--line);padding:.75rem 0;min-height:58px}
 .pack button > span{color:var(--muted);font-size:.875rem;text-align:right;flex:1;min-width:0}
@@ -205,6 +209,18 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <!-- YOU -->
   <div class="gut screen" data-tab="you" hidden>
     <section class="panel" id="sheet" style="margin-top:1rem"></section>
+    <section class="panel" id="glimPanel">
+      <div class="thead"><i class="glim big" id="glimOrb"></i><div><h2>Your glim</h2><p class="small" id="glimLine"></p></div></div>
+      <p class="small muted">Everyone here has a glim, a small light that has kept beside them since they were children. Yours came out of a Tallyman's cage and stayed. A glim lives on its person's walking: every step you take keeps it bright, even the ones outside a task. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
+      <label for="stepInput">Today's steps</label>
+      <div class="row">
+        <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400">
+        <button id="stepBtn">Log steps</button>
+      </div>
+      <p class="small num" id="stepLine"></p>
+      <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
+      <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
+    </section>
     <section>
       <p class="eyebrow">Since you arrived</p>
       <div class="stats" id="life" style="margin-top:.5rem"></div>
@@ -225,18 +241,6 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <p class="eyebrow">Your place in camp</p>
       <dl class="status" id="place" style="margin-top:.5rem"></dl>
       <div id="restBox" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem"></div>
-    </section>
-    <section class="panel" data-own="pip">
-      <div class="thead"><img class="face sm" src="art/p-pip.jpg" alt="" onerror="this.hidden=true"><h2>Pip's step count</h2></div>
-      <p class="small muted">Pip keeps a tally of every step you take, even the ones outside a task. Read today's steps from your phone's Health or Fit app and log them. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
-      <label for="stepInput">Today's steps</label>
-      <div class="row">
-        <input class="grow" style="flex-basis:8rem" type="number" id="stepInput" inputmode="numeric" min="0" max="200000" placeholder="e.g. 6400">
-        <button id="stepBtn">Log steps</button>
-      </div>
-      <p class="small num" id="stepLine"></p>
-      <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
-      <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
     <section class="panel" data-own="tobiah">
       <div class="thead"><img class="face sm" src="art/p-tobiah.jpg" alt="" onerror="this.hidden=true"><h2>Tobiah's rounds</h2></div>
@@ -357,7 +361,7 @@ const PEOPLE = {
     ['You kept up most of the way. Most.', 'Take the spare water skin. Do not make it a thing.'],
     ['If the fire ever goes out, you stand next to me.', 'I was wrong about you. I will only say it the once.']]},
   pip:{name:'Pip', role:'Ten years old. Nobody left but the camp.', lines:[
-    ['I counted your steps. You stop a lot.', 'Is it true you came from a place with food in bags?'],
+    ['Your glim goes dim when you stop. You stop a lot.', 'Is it true you came from a place with food in bags?'],
     ['You were faster today. I checked.', 'I told Dack you are not that slow. He laughed, but I told him.'],
     ['I cannot keep up with you any more. That is not fair.', 'When you find the way back, are you going to take it?']]},
   oona:{name:'Oona', role:'Weaver. Lost her loom in the fire.', lines:[
@@ -652,13 +656,13 @@ const neglect = () => S.neglect || (S.neglect = {lastHelp:today(), stage:0, rest
 const resting = () => neglect().restUntil >= today();
 const fireLit = () => S.stock.wood >= FIRE.night || resting() || fullMoon(today());
 function fireStep(stage, t){
-  if (stage === 1){ addTrust('dack', -1); note('The fire burned down to coals before morning. Something stood at the edge of what light was left and watched until dawn. Tobiah says they are only curious, so far. He also says nobody is to step into the shadows to look.'); return; }
-  if (stage === 2){ addTrust('maren', -1); addTrust('isla', -1); note('The fire was dead before dawn. Everyone shut themselves in the longhouse, because the Unlit will not go into a house. In the morning there were marks on the outside of the door that no hand made. Tobiah says one more dark night and they stop being curious.'); return; }
+  if (stage === 1){ addTrust('dack', -1); note('The fire burned down to coals before morning. Something stood at the edge of what light was left and watched until dawn. It stood nearest the corner where Pip sleeps. Tobiah says they are only curious, so far. He also says nobody is to step into the shadows to look.'); return; }
+  if (stage === 2){ addTrust('maren', -1); addTrust('isla', -1); note('The fire was dead before dawn. Everyone shut themselves in the longhouse, because the Unlit will not go into a house. In the morning there were marks on the outside of the door that no hand made, all of them at the height of a child. Tobiah says one more dark night and they stop being curious.'); return; }
   if (!lostList().length && !taken().dack){
     lost().dack = t; taken().dack = t; addTrust('maren', -1); S.board = null;
     if (S.offer && TASKS[S.offer.id].g === 'dack') S.offer = null;
     if (openTalk === 'dack') openTalk = '';
-    note('A third night with no fire. Everyone went into the longhouse except Dack, who would not leave the gap unwatched. In the morning his bow was leaning there and he was not. Pip saw him walk off up the valley in the dark, following something that carried no light. Tobiah says the ones the Unlit lead away are not killed. They are kept somewhere. Nobody here knows where, or the way to it.');
+    note('A third night with no fire. Everyone went into the longhouse except Dack, who had seen where the marks were and sat down in the gap between the dark and the door Pip was behind. In the morning his bow was leaning there and he was not. Pip saw him walk off up the valley in the dark, following something that carried no light. Tobiah says the ones the Unlit lead away are not killed. They are kept somewhere. Nobody here knows where, or the way to it.');
     return;
   }
   addTrust('maren', -1); addTrust('isla', -1);
@@ -708,7 +712,8 @@ function reasonsFor(k){
   else if (!fireLit() && (k === 'tobiah' || k === 'maren')) add(-1, 'There is not wood enough to keep the fire through tonight.');
   if (N.lastHelp === today() && S.stats.tasks) add(1, 'You carried for the camp today.');
   if (k === 'tobiah' && roundCount(roundsToday()) >= ROUND.bonusAt) add(1, 'You walked your rounds today without being asked.');
-  if (k === 'pip' && S.stepLog.date === today() && S.stepLog.steps >= 1000) add(1, S.stepLog.steps.toLocaleString() + ' steps notched on the tally stick today.');
+  if (k === 'pip') add(-1, 'He lost his glim when the river town burned.');
+  if (k === 'pip' && S.stepLog.date === today() && S.stepLog.steps >= 1000) add(1, 'Your glim is ' + glim().word + ' today, and he has been watching it.');
   const t = S.trust[k]; add(t >= 7 ? 2 : t >= 3 ? 1 : 0, t >= 7 ? 'Counts on you.' : t >= 3 ? 'Is getting used to you.' : 'Has not decided about you.');
   return out.sort((a, b) => Math.abs(b.n) - Math.abs(a.n));
 }
@@ -725,7 +730,14 @@ function campMood(){
   return {word:moodWord(n), tone:n < 0 ? 'bad' : n > 0 ? 'good' : '', line:'Hollow Ash is ' + moodWord(n) + '.' + (neg ? ' ' + PEOPLE[wk].name + ' is ' + w.word + '. ' + neg.t : ' Nobody at the fire is going without tonight.')};
 }
 
-/* Pip's tally: what the day came to. A note of where things stood is taken when the day starts, and the tally is the difference. */
+/* Your glim: a small light that lives on your walking. Today's steps are how bright it is. */
+function glim(steps){
+  const n = steps != null ? steps : S.stepLog && S.stepLog.date === today() ? S.stepLog.steps : 0;
+  const i = n >= 10000 ? 4 : n >= 7000 ? 3 : n >= 4000 ? 2 : n >= 1000 ? 1 : 0;
+  return {n, b:[.05, .3, .55, .8, 1][i], word:['guttering', 'low', 'steady', 'bright', 'blazing'][i], next:[1000, 4000, 7000, 10000][i]};
+}
+const glimOrb = cls => `<i class="glim${cls ? ' ' + cls : ''}" style="--b:${glim().b}"></i>`;
+/* The glim's tally: what the day came to. A note of where things stood is taken when the day starts, and the tally is the difference. */
 const TALLY_HOUR = 20;
 const snap = () => ({date:today(), meters:S.stats.meters, tasks:S.stats.tasks, wins:S.stats.wins, reps:S.stats.reps || 0, stock:Object.assign({}, S.stock), mood:Object.fromEntries(Object.keys(PEOPLE).map(k => [k, moodOf(k).n]))});
 function tally(){
@@ -733,7 +745,7 @@ function tally(){
   const rows = [], n = (x, one, many) => x + ' ' + (x === 1 ? one : many);
   const steps = S.stepLog.date === d.date ? S.stepLog.steps : 0, rounds = S.rounds && S.rounds.date === d.date ? roundCount(S.rounds) : 0;
   const tasks = S.stats.tasks - d.tasks, wins = S.stats.wins - d.wins, reps = (S.stats.reps || 0) - d.reps;
-  if (steps) rows.push(steps.toLocaleString() + ' steps notched on the stick.');
+  if (steps) rows.push(steps.toLocaleString() + ' steps. Your glim ' + (d.date === today() ? 'is ' : 'was ') + glim(steps).word + '.');
   if (tasks > 0) rows.push(n(tasks, 'task', 'tasks') + ' carried home, ' + fmtDist(Math.max(0, S.stats.meters - d.meters)) + ' on foot.');
   if (wins > 0 || reps > 0) rows.push((wins > 0 ? n(wins, 'fight', 'fights') + ' won' : 'No fights won') + (reps > 0 ? ', ' + n(reps, 'rep', 'reps') + ' done.' : '.'));
   if (rounds) rows.push(n(rounds, 'round', 'rounds') + ' of the camp walked for Tobiah.');
@@ -744,7 +756,7 @@ function tally(){
   const list = l => l.length === here.length && l.length > 2 ? 'Everyone at the fire' : l.map(k => PEOPLE[k].name).join(', ').replace(/, ([^,]*)$/, ' and $1');
   if (better.length) rows.push(list(better) + (better.length > 1 && better.length < here.length || better.length === 2 ? ' are' : ' is') + ' easier than this morning.');
   if (worse.length) rows.push(list(worse) + (worse.length > 1 && worse.length < here.length || worse.length === 2 ? ' are' : ' is') + ' worse off than this morning.');
-  if (quiet) rows.unshift('Nothing notched today. Pip turned the stick over twice and put it away.');
+  if (quiet) rows.unshift('Nothing walked today. Your glim has sunk to a coal and sits close against your collar.');
   return {date:d.date, quiet, rows};
 }
 // What to show on the board: a day you never heard the tally for, or today's once evening comes.
@@ -755,7 +767,7 @@ function tallyDue(){
 }
 function tallyHeard(){
   if (S.missed) delete S.missed;
-  else { const y = tally(); S.recapSeen = today(); if (y && !y.quiet) note('Pip read the day off the tally stick. ' + y.rows.slice(0, 2).join(' ')); }
+  else { const y = tally(); S.recapSeen = today(); if (y && !y.quiet) note('Your glim showed you the day. ' + y.rows.slice(0, 2).join(' ')); }
   save(); render();
 }
 const tallyHtml = y => `<ul class="why">${y.rows.map(r => `<li class="nil">${esc(r)}</li>`).join('')}</ul>`;
@@ -798,7 +810,11 @@ function newDay(){
   }
   if (S.home && !S.valleyTold){
     S.valleyTold = t;
-    note('Tobiah told it at the fire, because you asked why nobody else lives up here. He was a boy in this valley. It emptied in one winter and the river towns have called it forbidden ever since. That is why he led everyone here: the Tallymen will not follow. What emptied it he calls the Unlit. They stand at the edge of any light and will not step into it. They will not go into a house. Under a full moon you can walk anywhere. So the fire burns all night, every night, and nobody steps into the shadows.');
+    note('Tobiah told it at the fire, because you asked why nobody else lives up here. He was a boy in this valley. It emptied in one winter and the river towns have called it forbidden ever since. That is why he led everyone here: the Tallymen will not follow. What emptied it he calls the Unlit. They were old when the empire cut its first stone, and they are not people, though in bad light they are shaped a little like them. They stand at the edge of any light and will not step into it. They will not go into a house. Under a full moon you can walk anywhere. So the fire burns all night, every night, and nobody steps into the shadows.');
+  }
+  if (S.home && !S.glimTold){
+    S.glimTold = t;
+    note('The small light that has kept at your shoulder since the road has a name. Tobiah calls it a glim. Everyone here has had one since they were children, and the Tallymen take them as their share, by the cageful. You broke a cage when you landed and this one stayed. It lives on your walking: sit still and it sinks to a coal, walk and it burns. Pip has none. His went out when the river town burned. Tobiah thinks that is why the Unlit keep coming to look at him. They have no light of their own, and they take anything without one for theirs.');
   }
   if (!S.board || S.board.date !== t) makeBoard(t);
   if (!S.fever && standing() >= 5){
@@ -1322,25 +1338,25 @@ async function stepsPull(){
 const stepHelp = () => `<p class="small muted">One shortcut in the iPhone Shortcuts app does this. It has not been tried on a real phone yet, so say where it goes wrong.</p>
   <label for="stepUrlBox">Your phone's own link</label>
   <div class="row"><input class="grow" style="flex-basis:8rem;min-width:0;min-height:44px;padding:.5rem .6rem;font:400 .875rem Barlow,system-ui,sans-serif;color:var(--muted);background:var(--bg);border:2px solid var(--line);border-radius:4px" id="stepUrlBox" readonly value="${stepUrl()}"><button id="stepCopy">Copy</button></div>
-  <p class="small muted">Keep this link to yourself. Anyone who has it could send Pip a step count in your name, and nothing more.</p>
+  <p class="small muted">Keep this link to yourself. Anyone who has it could send a step count in your name, and nothing more.</p>
   <ol>
-  <li>Tap Copy above. Then open Shortcuts, tap +, and name the new shortcut Pip's tally.</li>
+  <li>Tap Copy above. Then open Shortcuts, tap +, and name the new shortcut Glim count.</li>
   <li>Add the action Find Health Samples. Set Type to Steps. Add the filter Start Date is today. Set Group By to Hour and Sort By to Start Date.</li>
   <li>Add Repeat with Each. Inside it add a Text action that holds three things in a row: Repeat Item with Start Date chosen and its date format set to Custom <b>H</b>, then a hyphen, then Repeat Item with Value chosen.</li>
   <li>Below End Repeat add Combine Text, with Custom separator <b>_</b> (an underscore).</li>
   <li>Add a URL action. Paste the link, and put the Combined Text right after the equals sign at its end.</li>
   <li>Add Get Contents of URL.</li>
-  <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here: Pip should have your steps.</li>
-  <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Pip's tally. Add one for each hour you want counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>`;
+  <li>Tap the play button once. Say Always Allow when it asks to read Health and when it asks to reach the link. Then come back here: your glim should have your steps.</li>
+  <li>To make it run by itself, go to the Automation tab, tap +, choose Time of Day, pick a time such as 9:45, Daily, Run Immediately, and choose Glim count. Add one for each hour you want counted. A quarter to the hour is best, because Tobiah decides at ten to whether to call you.</li></ol>`;
 function renderStepLink(){
   const box = $('stepLink'); if (!box) return;
   if (!PUSH_URL){ box.hidden = true; return; }
   const open = box.querySelector('details') ? box.querySelector('details').open : null;
-  if (!stepCode) box.innerHTML = `<h3>Let Pip count for you</h3>
-    <p class="small muted">Connect the Health app on your iPhone and your steps reach Pip every hour without you typing them, even while the game is closed. Only a step count for each hour of today is sent. No location, and nothing else from Health.</p>
+  if (!stepCode) box.innerHTML = `<h3>Let your glim count for you</h3>
+    <p class="small muted">Connect the Health app on your iPhone and your steps reach your glim every hour without you typing them, even while the game is closed. Only a step count for each hour of today is sent. No location, and nothing else from Health.</p>
     <button id="stepsOn"${stepLink.busy ? ' disabled' : ''}>${stepLink.busy ? 'Connecting…' : 'Connect my steps'}</button>${stepLink.msg ? `<p class="small" style="color:var(--warn)">${stepLink.msg}</p>` : ''}`;
-  else box.innerHTML = `<h3>Your phone counts for Pip</h3>
-    <p class="small num">${stepLink.at ? 'Pip last heard from your phone ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'Pip has not heard from your phone yet. Follow the steps below, then run the shortcut once.'}</p>
+  else box.innerHTML = `<h3>Your phone counts for your glim</h3>
+    <p class="small num">${stepLink.at ? 'Your glim last heard from your phone ' + (new Date(stepLink.at).toLocaleDateString('en-CA') === today() ? 'today' : 'on ' + new Date(stepLink.at).toLocaleDateString([], {month:'short', day:'numeric'})) + ' at ' + new Date(stepLink.at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + '.' : 'Your glim has not heard from your phone yet. Follow the steps below, then run the shortcut once.'}</p>
     <details class="lochelp"${(open == null ? !stepLink.at : open) ? ' open' : ''}><summary>How to set up the shortcut</summary>${stepHelp()}</details>
     <div class="row"><button class="quiet" id="stepsCheck">Check now</button><button class="quiet" id="stepsOff">Disconnect</button></div>`;
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
@@ -1386,9 +1402,9 @@ async function askAI(rules, turns, wantJson){
 }
 function worldBrief(){
   const arc = S.fever && !S.fever.done && !S.fever.failed ? `The infant Wren has a dangerous fever. Feverbark from the village of Low Fennick would cure it, and ${feverLeft()} day(s) remain.` : S.fever && S.fever.failed ? 'The Stranger failed to fetch feverbark in time. Tobiah made the walk himself and can no longer walk at all. Wren lived.' : S.fever && S.fever.done ? 'The Stranger fetched the feverbark that broke the infant Wren\'s fever.' : '';
-  return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They escaped into what the river towns call the forbidden valley and camp at a ruined waystation there called Hollow Ash: one longhouse, a fire, few stores. The Tallymen hold the crossings and commons at the valley mouth and take a share from every settlement, but they will not come into the valley itself. The valley has been deserted for a lifetime because of the Unlit: spirits that come down at night. They stand at the edge of any light and will not step into it, they will not go inside a house, and under a full moon it is safe to walk anywhere. So far they only seem curious, but people who step into the shadows at night are led away and not seen again, so everyone stays in the light. The camp keeps a fire burning all night, every night, which eats a great deal of wood. Tobiah lived in this valley as a boy before it emptied; he led the others here and remembers some of the old tricks for keeping the Unlit off, the all-night fire first among them. He does not know everything and says so. Nobody knows what the Unlit are.
-The player is "the Stranger", who fell out of thin air from another world (ours), out of shape and wearing Crocs, on top of one of two Tallymen who had caught Maren and Pip on the valley road. Maren took that man's cloak for him and gave him a rope, a belt knife and a waterskin, and they escaped up to Hollow Ash; Pip saw him fall and has counted his steps on a stolen tally stick ever since. He carries a dead phone, a house key and a TV remote from his world. Maren has told him the broken arch at Hollow Ash is the door his kind come through, long dead, and the only way he could ever be sent home. He is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
-The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee, the elder who was a boy in this valley), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan who counts the Stranger's steps), Oona (weaver who lost her loom).
+  return `This is a survival story game. Setting: a cold valley with no machines, no electricity and no writing beyond tally marks. Eleven survivors fled a river town burned by raiders called the Tallymen, after a stranger they trusted betrayed them. They escaped into what the river towns call the forbidden valley and camp at a ruined waystation there called Hollow Ash: one longhouse, a fire, few stores. The Tallymen hold the crossings and commons at the valley mouth and take a share from every settlement, but they will not come into the valley itself. The valley has been deserted for a lifetime because of the Unlit: spirits that come down at night. They stand at the edge of any light and will not step into it, they will not go inside a house, and under a full moon it is safe to walk anywhere. So far they only seem curious, but people who step into the shadows at night are led away and not seen again, so everyone stays in the light. The camp keeps a fire burning all night, every night, which eats a great deal of wood. Tobiah lived in this valley as a boy before it emptied; he led the others here and remembers some of the old tricks for keeping the Unlit off, the all-night fire first among them. He does not know everything and says so. The Unlit are ancient, far older than the old empire or the Tallymen, and not human, though shaped a little like people in bad light. They have no light of their own. Tobiah believes they are drawn to Pip because he has no glim, and take anything without a light for one of theirs. A glim is too small a light to hold them off; a fire is not. Nobody knows more than this about what the Unlit are.
+The player is "the Stranger", who fell out of thin air from another world (ours), out of shape and wearing Crocs, on top of one of two Tallymen who had caught Maren and Pip on the valley road. Maren took that man's cloak for him and gave him a rope, a belt knife and a waterskin, and they escaped up to Hollow Ash; Everyone in this world has a glim: a small living light that has kept beside them since childhood and lives on its person's walking, burning brighter the more they walk. The Tallymen take glims as their share and carry them off in cages. The Stranger broke such a cage when he fell, the glims scattered, and one stayed with him; it is ${glim().word} today after ${glim().n.toLocaleString()} steps. Pip lost his own glim when the river town burned and watches the Stranger's closely. He carries a dead phone, a house key and a TV remote from his world. Maren has told him the broken arch at Hollow Ash is the door his kind come through, long dead, and the only way he could ever be sent home. He is allowed to stay only by working: hauling water, wood, food, stone and reeds on foot.
+The camp: Maren (leader, ferrywoman, widowed in the escape), Tobiah (old healer with a ruined knee, the elder who was a boy in this valley), Isla (mother of the infant Wren), Dack (blunt hunter who distrusts the Stranger), Pip (ten-year-old orphan, the only one in camp with no glim), Oona (weaver who lost her loom).
 Facts right now. Stores: ${Object.entries(RES).map(([k, n]) => S.stock[k] + ' ' + n.toLowerCase()).join(', ')}. Built so far: ${BUILDS.filter(b => S.built[b.k]).map(b => b.name).join(', ') || 'nothing but the longhouse'}. What the Stranger has noticed about the old empire so far: ${frags().slice(-3).map(findText).join(' ') || 'nothing yet'} Nobody in camp can read the old writing or explain these things. They are uneasy about them, do not invent explanations, and would rather talk about the work. Inside the longhouse, still broken: ${REPAIRS.filter(r => !S.fixed[r.k]).map(r => r.bad + ' ' + r.hurt).join(' ') || 'nothing, the Stranger mended all of it'}. The Stranger sleeps: ${sleep()}. The Stranger is called: ${RANKS[rankIdx()][1]}. Tasks the Stranger has completed: ${S.stats.tasks}. ${arc}${takenList().length ? ' ' + names(takenList()) + (takenList().length > 1 ? ' are' : ' is') + ' held captive in the Tallymen stockade at the valley mouth. The camp wants them back.' : ''}${lostList().length ? ' ' + names(lostList()) + ' was led away up the valley by the Unlit after the fire went out three nights running. Tobiah believes he is alive and kept somewhere. Nobody knows where or how to get him back, and nobody should invent a way.' : ''}${neglect().stage ? ' The night fire has gone out ' + (neglect().dark || 1) + ' night(s) running for lack of wood, and the Unlit are coming closer.' : !fireLit() ? ' There is not enough wood for tonight\'s fire and everyone knows it.' : ''}${fullMoon(today()) ? ' Tonight is a full moon.' : ''}`;
 }
 function charRules(k){
@@ -1473,13 +1489,13 @@ const INTRO = [
   {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into a cold hillside with a ruined arch on the far ridge',
    html:'<p>You are on the couch with a bag of chips on your chest and the remote in your hand, half watching something. You have not stood up in hours.</p><p>The room tilts.</p>'},
   {img:'intro-fall', eye:'Somewhere else', alt:'You, falling out of thin air above an old stone road, where two men in grey are tying up a woman and holding a boy by the collar',
-   html:'<p>When it stops you are ten feet above an old stone road at dusk, and falling. Your phone lights up in your pocket. No signal.</p><p>Below you, two men in grey with notched sticks on their belts have caught a woman and a boy. One is knotting a rope round her wrists. Only the boy is looking up.</p>'},
+   html:'<p>When it stops you are ten feet above an old stone road at dusk, and falling. Your phone lights up in your pocket. No signal.</p><p>Below you, two men in grey with notched sticks on their belts have caught a woman and a boy. One is knotting a rope round her wrists. The other carries a wicker cage full of small lights, crowded together like sparks in a jar. Only the boy is looking up.</p>'},
   {img:'intro-landing', eye:'The landing', alt:'You, landed flat on one of the men in a cloud of dust and chips, while the woman knocks the other one down with her spear',
-   html:'<p>You land on the one with the rope. It is the most useful thing you have done all year, and you did it by accident.</p><p>The woman has the other one on the ground before he finishes turning round. Then she looks at you: the hoodie, the foam clogs, the remote still in your fist.</p>'},
+   html:'<p>You land on the one with the rope. It is the most useful thing you have done all year, and you did it by accident. The cage goes over with him and splits. The lights pour out and scatter into the trees. One does not. It hangs in front of your face, the size of a thumbnail, and then settles at your shoulder.</p><p>The woman has the other one on the ground before he finishes turning round. Then she looks at you: the hoodie, the foam clogs, the remote still in your fist.</p>'},
   {img:'intro-cloak', eye:'What they carried', alt:'You, pulling on a dead-grey cloak and staring at your phone, while the woman holds out a knife and a waterskin and the boy holds up a notched stick',
-   html:'<p><span class="say">"Take his cloak. Quick."</span> His boots are far too small for you. She looks at your clogs again and gives up. <span class="say">"Then you run in those."</span></p><p>She and the boy go through both men. You are handed the rope that was meant for their wrists, a belt knife and a half-full waterskin. The boy keeps one of the notched sticks. Your phone says 4%. Down the valley, torches are coming.</p>'},
+   html:'<p><span class="say">"Take his cloak. Quick."</span> His boots are far too small for you. She looks at your clogs again and gives up. <span class="say">"Then you run in those."</span></p><p>She and the boy go through both men. You are handed the rope that was meant for their wrists, a belt knife and a half-full waterskin. The boy keeps one of the notched sticks. He has not taken his eyes off the light at your shoulder. <span class="say">"That is a glim,"</span> the woman says. <span class="say">"They took it off somebody. It seems to think it is yours now."</span> She has one too, tucked under her collar. The boy does not. Your phone says 4%. Down the valley, torches are coming.</p>'},
   {img:'intro-climb', eye:'The climb', alt:'You, bent double on a steep mountain path at night, far behind the woman and the boy, with torches on the valley road below and a ruined arch on the ridge above',
-   html:'<p>It is the longest walk you have taken in years, uphill in the dark, by the light of your phone until she makes you cover it. You stop four times. She does not wait, but she does not lose you either.</p><p>You give the boy a piece of gum from your pocket. He says his name is Pip, and he cuts a notch in the stick for every hundred of your steps.</p>'},
+   html:'<p>It is the longest walk you have taken in years, uphill in the dark, by the light of your phone until she makes you cover it. You stop four times. She does not wait, but she does not lose you either.</p><p>You give the boy a piece of gum from your pocket. He says his name is Pip. <span class="say">"It gets brighter when you walk,"</span> he says, pointing at your shoulder. <span class="say">"Look."</span> He is right. By the top of the path it is the brightest thing on the mountain.</p>'},
   {img:'intro-edge', eye:'Hollow Ash', alt:'You, in the stolen cloak by the campfire with a bowl, the others watching from across the flames, a ruined arch behind them',
    html:'<p>At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"He fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>'}
 ];
@@ -1570,7 +1586,7 @@ function render(){
   const el = $('main'), m = S.mission;
   $('practiceBanner').hidden = !practice;
   { const y = S.intro && S.home && !S.mission ? tallyDue() : null, box = $('tallyBox'); box.hidden = !y;
-    if (y){ box.innerHTML = `<div class="thead">${pic('p-pip', 'face sm')}<h2>Pip's tally of ${y.old ? new Date(y.date + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) : 'the day'}</h2></div>${tallyHtml(y)}<button class="quiet" id="tallyOk" style="align-self:flex-start">${y.old ? 'Good' : 'Good night, Pip'}</button>`; $('tallyOk').onclick = tallyHeard; } }
+    if (y){ box.innerHTML = `<div class="thead">${glimOrb()}<h2>Your glim shows you ${y.old ? new Date(y.date + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) : 'the day'}</h2></div>${tallyHtml(y)}<button class="quiet" id="tallyOk" style="align-self:flex-start">${y.old ? 'Good' : 'Good night'}</button>`; $('tallyOk').onclick = tallyHeard; } }
   $('newsBanner').hidden = !shortcutNews; $('newsText').innerHTML = '<b>Tobiah\'s rounds.</b> ' + esc(shortcutNews);
   const playing = S.intro && !!S.home;
   $('hud').hidden = !playing; $('tabs').hidden = !playing || !!S.mission;
@@ -1917,8 +1933,9 @@ function renderCamp(){
     $('pack').querySelectorAll('button').forEach(b => b.onclick = () => openSheet(b.dataset.open)); }
   { const cm = campMood(), cl = $('campLine'); if (cl) cl.textContent = cm.line;
     const box = $('tallyNow'), y = S.dayStart && S.dayStart.date === today() ? tally() : null;
-    if (box) box.innerHTML = y ? `<button class="quiet" id="tallyAsk" style="align-self:flex-start">${tallyOpen ? 'That will do, Pip' : 'Ask Pip for the tally so far'}</button>${tallyOpen ? tallyHtml(y) : ''}` : '';
+    if (box) box.innerHTML = y ? `<button class="quiet" id="tallyAsk" style="align-self:flex-start">${tallyOpen ? 'That will do' : 'See the day so far'}</button>${tallyOpen ? tallyHtml(y) : ''}` : '';
     if ($('tallyAsk')) $('tallyAsk').onclick = () => { tallyOpen = !tallyOpen; renderCamp(); }; }
+  { const g = glim(); $('glimOrb').style.setProperty('--b', g.b); $('glimLine').textContent = 'It is ' + g.word + '.' + (g.next ? ' ' + (g.next - g.n).toLocaleString() + ' more steps and it burns brighter.' : ' It cannot burn brighter than this.'); }
   $('stepLine').textContent = sl.steps ? 'Logged today: ' + sl.steps.toLocaleString() + ' steps. Next chore at ' + ((Math.floor(sl.steps / 1000) + 1) * 1000).toLocaleString() + '.' : 'Nothing logged today.';
   { const r = roundsToday(), n = roundCount(r), nowH = new Date().getHours(), lab = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p'), any = Object.keys(r.hours).length;
     $('roundPips').innerHTML = roundHours().map(h => `<span class="${(r.hours[h] || 0) >= ROUND.steps ? 'on' : h === nowH ? 'now' : ''}"><i></i>${lab(h)}</span>`).join('');
@@ -1974,7 +1991,7 @@ $('stepBtn').onclick = () => {
   const n = Math.floor(+$('stepInput').value);
   if (!(n >= 0) || n > 200000){ $('stepLine').textContent = 'Enter a step count between 0 and 200,000.'; return; }
   const e = logSteps(n);
-  if (e) $('stepLine').textContent += ' Pip marked ' + e + (e === 1 ? ' chore done.' : ' chores done.');
+  if (e) $('stepLine').textContent += ' Your glim marked ' + e + (e === 1 ? ' chore done.' : ' chores done.');
 };
 $('ideaBtn').onclick = () => pitch($('ideaWho').value, $('ideaText').value);
 $('keySave').onclick = () => { const v = $('keyInput').value.trim(); if (v){ apiKey = v; store.set('lwb-key', v); $('keyInput').value = ''; } model = $('modelSel').value; store.set('lwb-model', model); renderCamp(); };
@@ -2000,7 +2017,7 @@ const qp = new URLSearchParams(location.search), qs = qp.get('steps'), qh = pars
 if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
   const got = qh ? logHours(qh) : {earned:0, bonus:false, chores:0};
   if (qs && /^\d{1,6}$/.test(qs)) got.chores += logSteps(Math.max(+qs, S.stepLog.steps));
-  if (got.earned || got.chores) shortcutNews = (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? 'Pip marked ' + got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
+  if (got.earned || got.chores) shortcutNews = (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? 'Your glim marked ' + got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
   try { history.replaceState(null, '', location.pathname); } catch {}
 }
 if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; openPerson = 'tobiah'; sheet = 'person'; try { history.replaceState(null, '', location.pathname); } catch {} }
