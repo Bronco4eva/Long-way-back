@@ -45,9 +45,32 @@ p{margin:0}
 .hud-stores small{font:500 .6875rem var(--body);color:var(--muted);white-space:nowrap}
 /* screen tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom, 0px)}
-.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
-.tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:56px;padding:.3rem .05rem;font:400 1.1rem var(--display);color:var(--muted);margin-top:-2px}
+.tabs div{max-width:30rem;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:58px;padding:.3rem .05rem;font:400 1.4rem var(--display);color:var(--muted);margin-top:-2px}
 .tabs button[aria-current="true"]{color:var(--ember);border-top-color:var(--ember)}
+.col{display:flex;flex-direction:column;gap:1.1rem}
+.screen[data-tab=camp]{margin-top:-1.25rem;gap:1rem}
+.vscroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x pan-y;border-bottom:2px solid var(--line);background:var(--raised)}
+.vscroll::-webkit-scrollbar{display:none}
+.vscroll .vmap{height:min(44vh,360px);aspect-ratio:16/9}
+.vscroll .scene{width:100%;height:100%;max-width:none;border:0;border-radius:0}
+.vscroll .vmap svg{inset:0;width:100%;height:100%}
+.sheet{padding-top:.75rem}
+.backbtn{align-self:flex-start;position:sticky;top:calc(env(safe-area-inset-top, 0px) + 3.4rem);z-index:5;min-height:40px;background:var(--surface)}
+button.bare{border:0;border-radius:0;padding:0;min-height:0;text-align:left;background:none;color:inherit;font:inherit}
+.ask{display:flex;gap:12px;align-items:center;width:100%;background:var(--surface);border:2px solid var(--line);border-left:4px solid var(--ember);padding:.7rem .8rem}
+.ask h3{margin-bottom:.2rem}.ask span{display:block;min-width:0}
+.fire{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.fire button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8125rem;color:var(--ink);text-align:center}
+.fire .face{width:100%;height:auto;aspect-ratio:1}
+.fire em{font-style:normal;font-size:.6875rem;line-height:1.15;color:var(--muted)}.fire em.bad{color:var(--warn)}.fire em.good{color:var(--moss)}
+.fire i{position:absolute;left:-4px;top:-4px;width:12px;height:12px;background:var(--ember);border:2px solid var(--bg)}
+.fire .gone .face{filter:grayscale(1) brightness(.45)}
+.pack{display:flex;flex-direction:column}
+.pack button{display:flex;justify-content:space-between;gap:12px;align-items:center;width:100%;border-top:2px solid var(--line);padding:.75rem 0;min-height:58px}
+.pack button > span{color:var(--muted);font-size:.875rem;text-align:right;flex:1;min-width:0}
+.sheet .people li{border-top:0;padding-top:0}.sheet .people .face{width:104px;height:104px}
+.hud-stores em{font:400 .6875rem var(--body);font-style:normal;color:var(--muted)}.hud-stores div.low em{color:var(--ember)}
 .banner{background:var(--surface);border:1px dashed var(--warn);padding:.6rem .75rem;border-radius:4px;font-size:.875rem;display:flex;gap:.75rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .panel{background:var(--surface);border:2px solid var(--line);border-radius:4px;padding:1rem;display:flex;flex-direction:column;gap:.9rem}
 .scene{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:2px solid var(--line);border-radius:4px;background:var(--raised)}
@@ -151,36 +174,59 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   <div class="hud gut" id="hud" hidden>
     <div class="hud-top"><span id="hudDay"></span><span id="hudRank"></span><span id="hudCarry" class="num"></span></div>
     <div class="hud-bar" role="img" id="hudBar" aria-label=""><i id="hudProg"></i></div>
-    <div class="hud-stores" id="hudStores"></div>
   </div>
 
-  <div class="gut screen" data-tab="board" style="padding-top:1rem">
+  <!-- CAMP: the village is the home screen -->
+  <div class="screen" data-tab="camp" hidden>
+    <div class="vscroll" id="vscroll"><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span></div>
+    <div class="gut col">
+      <p class="say" id="campLine"></p>
+      <p class="small alarm" id="campWarn" hidden></p>
     <div class="banner" id="newsBanner" hidden style="border-color:var(--moss)"><span id="newsText"></span><button class="quiet" id="newsOk">Good</button></div>
+    <section class="panel" id="tallyBox" hidden></section>
+      <div id="askBox"></div>
+      <div><p class="eyebrow" style="margin-bottom:.4rem">At the fire</p><div class="fire" id="fire"></div></div>
+      <div class="hud-stores" id="hudStores"></div>
+      <div id="missing"></div>
+      <div><button class="quiet" data-open="plans">Everything the camp means to build</button></div>
+      <p class="small muted">Slide the picture. Tap a building or a place to walk over to it.</p>
+    </div>
+  </div>
+
+  <!-- WALK: the board, and then the walk alone -->
+  <div class="gut screen" data-tab="walk" hidden style="padding-top:1rem">
     <div class="banner" id="practiceBanner" hidden>
       <span><b>Practice mode.</b> No GPS here, so you walk by tapping. This story is kept apart from your real one.</span>
       <button class="quiet" id="exitPractice">Use real GPS</button>
     </div>
-    <section class="panel" id="tallyBox" hidden></section>
     <section class="panel" id="main" aria-live="polite"></section>
   </div>
 
-  <div class="gut screen" data-tab="camp" hidden>
-    <div><p class="eyebrow">Hollow Ash</p><h1>The Long Way Back</h1></div>
-    <div><span class="vmap" id="campPic"><img class="scene" src="art/village-1.jpg" alt="Hollow Ash at dusk: a run-down longhouse, a fire with three figures, a ruined arch and an old mine in the hills" onerror="this.hidden=true"></span>
-      <p class="say" id="campLine" style="margin:.6rem 0 0"></p>
-      <p class="small muted" style="margin:.4rem 0 0">Tap the buildings and places in the picture to walk over to them.</p></div>
-    <section class="panel" id="spotBox"></section>
+  <!-- YOU -->
+  <div class="gut screen" data-tab="you" hidden>
+    <section class="panel" id="sheet" style="margin-top:1rem"></section>
     <section>
-      <p class="eyebrow">The known world</p>
-      <canvas id="world" aria-label="Map of camp and the places you have found" style="margin-top:.5rem"></canvas>
-      <p class="small muted" id="worldLine"></p>
+      <p class="eyebrow">Since you arrived</p>
+      <div class="stats" id="life" style="margin-top:.5rem"></div>
     </section>
     <section>
+      <p class="eyebrow">In your pack</p>
+      <div class="pack" id="pack"></div>
+    </section>
+  </div>
+
+  <!-- Places, people and the things in your pack open over the top, each with a way back -->
+  <div class="gut screen sheet" data-sheet="place" hidden><button class="quiet backbtn" data-back>Back</button>
+    <section class="panel" id="spotBox"></section>
+  </div>
+  <div class="gut screen sheet" data-sheet="person" hidden><button class="quiet backbtn" data-back>Back</button>
+    <ul class="people" id="people"></ul>
+    <section data-own="maren">
       <p class="eyebrow">Your place in camp</p>
       <dl class="status" id="place" style="margin-top:.5rem"></dl>
       <div id="restBox" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem"></div>
     </section>
-    <section class="panel">
+    <section class="panel" data-own="pip">
       <div class="thead"><img class="face sm" src="art/p-pip.jpg" alt="" onerror="this.hidden=true"><h2>Pip's step count</h2></div>
       <p class="small muted">Pip keeps a tally of every step you take, even the ones outside a task. Read today's steps from your phone's Health or Fit app and log them. Every 1,000 counts as a camp chore done and adds one to whichever store is lowest.</p>
       <label for="stepInput">Today's steps</label>
@@ -192,7 +238,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <div id="tallyNow" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem"></div>
       <div id="stepLink" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;border-top:1px solid var(--line);padding-top:.75rem"></div>
     </section>
-    <section class="panel">
+    <section class="panel" data-own="tobiah">
       <div class="thead"><img class="face sm" src="art/p-tobiah.jpg" alt="" onerror="this.hidden=true"><h2>Tobiah's rounds</h2></div>
       <p class="small muted">Tobiah sat out one winter with his knee and it never came right. His rule for you: do not stay down for a whole hour. Every hour of the day in which you get up and walk a round of the camp counts as a chore done, and the fourth round of a day earns his trust and a bundle of herbs. A round is three minutes on your feet.</p>
       <div class="rounds" id="roundPips" role="img"></div>
@@ -203,23 +249,7 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <details class="lochelp"><summary>Count real steps from Health instead (Safari only)</summary><div id="roundHelp"></div></details>
     </section>
   </div>
-
-  <div class="gut screen" data-tab="you" hidden>
-    <section class="panel" id="sheet" style="margin-top:1rem"></section>
-    <section>
-      <p class="eyebrow">Since you arrived</p>
-      <div class="stats" id="life" style="margin-top:.5rem"></div>
-    </section>
-  </div>
-
-  <div class="gut screen" data-tab="people" hidden>
-    <section>
-      <p class="eyebrow" style="padding-top:1rem">The people of Hollow Ash</p>
-      <ul class="people" id="people"></ul>
-    </section>
-  </div>
-
-  <div class="gut screen" data-tab="build" hidden>
+  <div class="gut screen sheet" data-sheet="plans" hidden><button class="quiet backbtn" data-back>Back</button>
     <section>
       <p class="eyebrow" style="padding-top:1rem">Stores</p>
       <div class="stock" id="stock" style="margin-top:.5rem"></div>
@@ -240,17 +270,28 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
       <p class="say" id="ideaOut"></p>
     </section>
   </div>
-
-  <div class="gut screen" data-tab="journal" hidden>
+  <div class="gut screen sheet" data-sheet="journal" hidden><button class="quiet backbtn" data-back>Back</button>
     <section>
       <p class="eyebrow" style="padding-top:1rem">Journal</p>
       <ul class="journal" id="journal"></ul>
     </section>
+  </div>
+  <div class="gut screen sheet" data-sheet="finds" hidden><button class="quiet backbtn" data-back>Back</button>
     <section>
       <p class="eyebrow">The old empire</p>
       <p class="small muted" id="loreLine" style="margin-top:.4rem"></p>
       <ol class="lore" id="lore"></ol>
     </section>
+  </div>
+  <div class="gut screen sheet" data-sheet="map" hidden><button class="quiet backbtn" data-back>Back</button>
+    <section>
+      <p class="eyebrow">The known world</p>
+      <canvas id="world" aria-label="Map of camp and the places you have found" style="margin-top:.5rem"></canvas>
+      <p class="small muted" id="worldLine"></p>
+    </section>
+  </div>
+  <div class="gut screen sheet" data-sheet="phone" hidden><button class="quiet backbtn" data-back>Back</button>
+    <div><p class="eyebrow">Your phone</p><p class="say" style="margin-top:.4rem">It died the night you reached Hollow Ash. Nobody here knows what it is. Until something charges it, this is where the things from outside the story are kept.</p></div>
     <section class="panel">
       <h2>Villager voices</h2>
       <p class="small" id="aiStatus"></p>
@@ -286,8 +327,8 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
   </div>
 </div>
 
-<nav class="tabs" id="tabs" hidden aria-label="Game screens"><div>
-  <button data-go="board">Board</button><button data-go="camp">Camp</button><button data-go="you">You</button><button data-go="people">People</button><button data-go="build">Build</button><button data-go="journal">Journal</button>
+<nav class="tabs" id="tabs" hidden aria-label="Where you are"><div>
+  <button data-go="camp">Camp</button><button data-go="walk">Walk</button><button data-go="you">You</button>
 </div></nav>
 
 <script>
@@ -1368,15 +1409,39 @@ Costs are whole numbers from 0 to 30. An accepted idea must cost between 8 and 5
 }
 
 /* ---------- rendering ---------- */
-let shownKey = '', abandonArmed = false, resetArmed = false, tab = 'board';
+let shownKey = '', abandonArmed = false, resetArmed = false, tab = 'camp';
+/* Three places to be: Camp, Walk and You. A place in the village, a person, or a thing in your pack opens over the top
+   as a "sheet" with a way back. Older names for screens still work and land on their new home. */
+let sheet = '', openPerson = '', backY = 0;
+const OLD_TAB = {board:'walk', people:'camp', build:'camp', journal:'you'};
 function showTab(t){
-  tab = t;
-  document.querySelectorAll('[data-tab]').forEach(e => e.hidden = e.dataset.tab !== t);
-  document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-current', String(b.dataset.go === t)));
-  if (t === 'board') requestAnimationFrame(drawRadar);
-  if (t === 'camp') requestAnimationFrame(drawWorld);
+  tab = OLD_TAB[t] || t;
+  document.querySelectorAll('[data-tab]').forEach(e => e.hidden = !!sheet || e.dataset.tab !== tab);
+  document.querySelectorAll('[data-sheet]').forEach(e => e.hidden = e.dataset.sheet !== sheet);
+  document.querySelectorAll('[data-own]').forEach(e => e.hidden = e.dataset.own !== openPerson || !!taken()[openPerson]);
+  document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-current', String(b.dataset.go === tab)));
+  if (!sheet && tab === 'walk') requestAnimationFrame(drawRadar);
+  if (sheet === 'map') requestAnimationFrame(drawWorld);
+  if (!sheet && tab === 'camp') requestAnimationFrame(centreVillage);
 }
-document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { showTab(b.dataset.go); window.scrollTo(0, 0); });
+function openSheet(name){ if (!sheet) backY = window.scrollY; sheet = name; showTab(tab); renderCamp(); window.scrollTo(0, 0); }
+function closeSheet(){ sheet = ''; openTalk = ''; talkErr = ''; showTab(tab); renderCamp(); window.scrollTo(0, backY); }
+function openPersonSheet(k){ openPerson = k; openTalk = aiOn() && !taken()[k] ? k : ''; talkErr = ''; openSheet('person'); }
+// The first time the village is shown, slide it so the longhouse sits in the middle.
+let villageCentred = false;
+function centreVillage(){ const v = $('vscroll'); if (!v || villageCentred || !v.clientWidth || v.scrollWidth <= v.clientWidth) return; villageCentred = true; v.scrollLeft = v.scrollWidth * .43 - v.clientWidth / 2; }
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { sheet = ''; openTalk = ''; showTab(b.dataset.go); renderCamp(); window.scrollTo(0, 0); });
+document.querySelectorAll('[data-back]').forEach(b => b.onclick = closeSheet);
+document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openSheet(b.dataset.open));
+// Who has a task waiting for you today, most pressing first.
+function asks(){
+  const out = [], arc = S.fever && !S.fever.done && !S.fever.failed;
+  if (!S.board) return out;
+  if (takenList().length) out.push({who:TASKS.rescue.g, t:TASKS.rescue.t, sub:'The Tallymen hold ' + names(takenList()) + '.'});
+  if (arc) out.push({who:TASKS.fever.g, t:TASKS.fever.t, sub:'Wren is burning up. ' + feverLeft() + (feverLeft() === 1 ? ' day left.' : ' days left.')});
+  S.board.ids.filter(id => !S.board.done[id]).forEach(id => out.push({who:TASKS[id].g, t:TASKS[id].t, sub:TASKS[id].d}));
+  return out.filter(a => a.who && PEOPLE[a.who]);
+}
 let introStep = 0;
 const INTRO = [
   {img:'couch', eye:'Before', alt:'You, on the couch, as the living room dissolves into a cold hillside with a ruined arch on the far ridge',
@@ -1482,8 +1547,9 @@ function render(){
     if (y){ box.innerHTML = `<div class="thead">${pic('p-pip', 'face sm')}<h2>Pip's tally of ${y.old ? new Date(y.date + 'T12:00').toLocaleDateString(undefined, {weekday:'long'}) : 'the day'}</h2></div>${tallyHtml(y)}<button class="quiet" id="tallyOk" style="align-self:flex-start">${y.old ? 'Good' : 'Good night, Pip'}</button>`; $('tallyOk').onclick = tallyHeard; } }
   $('newsBanner').hidden = !shortcutNews; $('newsText').innerHTML = '<b>Tobiah\'s rounds.</b> ' + esc(shortcutNews);
   const playing = S.intro && !!S.home;
-  $('hud').hidden = $('tabs').hidden = !playing;
-  showTab(playing ? tab : 'board');
+  $('hud').hidden = !playing; $('tabs').hidden = !playing || !!S.mission;
+  if (!playing || S.mission) sheet = '';   // out on a walk there is only the walk
+  showTab(!playing || S.mission ? 'walk' : tab);
   if (!S.intro){
     const I = INTRO[introStep], last = introStep === INTRO.length - 1;
     el.innerHTML = `${pic(I.img, 'scene', I.alt)}<p class="eyebrow">${I.eye}</p><div class="story">${I.html}</div>
@@ -1599,7 +1665,7 @@ function tick(){
       if (pos){
         const rough = pos.acc > 150;
         $('gpsLine').textContent = 'Finding you… your phone says it knows where you are to within ' + far(pos.acc) + '.' + (rough && waited > 8000 ? ' That is too rough to play well. Go outside or stand by a window, make sure Wi-Fi is on, and on iPhone check that Precise Location is on for your browser.' : '');
-        const u = $('useRough'); if (u){ u.hidden = !(rough && waited > 8000); u.onclick = () => { S.home = {lat:pos.lat, lng:pos.lng}; S.offer = null; wantHome = 0; newDay(); note('You marked camp from a rough location. Move home base from the Journal tab once you have a better signal.'); render(); }; }
+        const u = $('useRough'); if (u){ u.hidden = !(rough && waited > 8000); u.onclick = () => { S.home = {lat:pos.lat, lng:pos.lng}; S.offer = null; wantHome = 0; newDay(); note('You marked camp from a rough location. Move home base from your phone, on the You screen, once you have a better signal.'); render(); }; }
       } else if (waited > 12000) $('gpsLine').textContent = 'Still no location from your phone' + (gpsWhy ? ' (' + gpsWhy + ')' : '') + '. Check that Location is on for the phone itself, turn Wi-Fi on, and step outside. The game keeps trying.';
     }
     return;
@@ -1617,7 +1683,7 @@ function tick(){
     $('dBig').textContent = fmtDist(dist(pos, tg));
     $('dLine').textContent = 'Head ' + compass(bearing(pos, tg)) + (m.phase === 'out' ? '.' : ' to camp.');
     $('gpsLine').textContent = practice ? 'Practice mode: tap Walk to move.' : pos.acc > 100 ? 'Your phone only knows where you are to within ' + Math.round(pos.acc) + ' m, which is too rough to count this walk. It usually sharpens once you are outside and moving.' : 'GPS accuracy ±' + Math.round(pos.acc) + ' m. The game notices when you arrive, even if the phone was locked on the way.';
-  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open the Journal tab and tap Location help.' : geoError || 'Finding your location. Tap anywhere on the screen if this does not clear in a few seconds.'; }
+  } else { $('dBig').textContent = '…'; $('dLine').textContent = geoBlocked ? 'Location is blocked for this page. Open You, then Your phone, and tap Location help.' : geoError || 'Finding your location. Tap anywhere on the screen if this does not clear in a few seconds.'; }
   updateCompass();
   $('sWalk').textContent = fmtDist(m.meters);
   $('sTime').textContent = fmtTime(Date.now() - m.t0);
@@ -1696,7 +1762,7 @@ function renderCamp(){
   $('hudCarry').textContent = 'Carry ' + carry();
   $('hudProg').style.width = (next ? Math.round((standing() - base) / (next[0] - base) * 100) : 100) + '%';
   $('hudBar').setAttribute('aria-label', next ? (next[0] - standing()) + ' trust to ' + next[1] : 'Highest standing');
-  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small></div>`).join('');
+  $('hudStores').innerHTML = Object.entries(RES).map(([k, name]) => `<div style="--c:${TINT[k]}" class="${n0[k] && S.stock[k] < n0[k] * 2 ? 'low' : ''}">${S.stock[k]}<small>${name.split(' ')[0]}</small>${n0[k] > 0 ? `<em>${Math.floor(S.stock[k] / n0[k]) === 1 ? '1 day' : Math.floor(S.stock[k] / n0[k]) + ' days'}</em>` : ''}</div>`).join('');
   { const sp = SPOTS.find(s => s.k === openSpot) || SPOTS[0], stage = villageStage(), box = $('spotBox');
     const face = who => pic('p-' + who, 'face sm');
     const hurts = (who, hurt) => `<span class="hurt">${taken()[who] ? PEOPLE[who].name + ' is not here to suffer it. The Tallymen have ' + PEOPLE[who].name + '.' : hurt}</span>`;
@@ -1739,7 +1805,7 @@ function renderCamp(){
       c.innerHTML = villagePic('scene') + '<svg viewBox="0 0 1024 576" preserveAspectRatio="none">' + SPOTS.filter(s => s.k !== 'house').concat(SPOTS[0]).map(s => { const st = spotState(s.k);
         return `<g class="spot${s.k === openSpot && tapN ? ' tapped' : ''}" data-spot="${s.k}" tabindex="0" role="button" aria-pressed="${s.k === openSpot}" aria-label="${s.name}: ${word[st]}">` + SHAPES[s.k].filter(a => stage >= a[0] && stage <= a[1]).map(a => { const n = a[2].split(' ');
           return a[2].includes(',') ? `<polygon points="${a[2]}"/>` : `<ellipse cx="${n[0]}" cy="${n[1]}" rx="${n[2]}" ry="${n[3]}"/>`; }).join('') + '</g>'; }).join('') + '</svg>';
-      c.querySelectorAll('.spot').forEach(g => { const go = () => { openSpot = g.dataset.spot; tapN++; renderCamp(); $('spotBox').scrollIntoView({behavior:'smooth', block:'nearest'}); };
+      c.querySelectorAll('.spot').forEach(g => { const go = () => { openSpot = g.dataset.spot; tapN++; openSheet('place'); };
         g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } }; });
     } }
   { const lv = level(), x = xp(), lo = lvlAt(lv), hi = lvlAt(lv + 1), pts = points();
@@ -1763,7 +1829,7 @@ function renderCamp(){
     $('restBox').innerHTML = (CS.warn ? `<p class="small alarm">${CS.warn}</p>` : '') + `<button id="restBtn" ${N.rests < 1 || resting() ? 'disabled' : ''}>${resting() ? 'Resting with Maren\'s leave' : 'Tell Maren you need two rest days (' + N.rests + ' banked)'}</button>
       <p class="small muted">The camp needs one finished task every other day. Miss more than that and the Tallymen notice: first scouts, then a mark on the door, then they take someone. Rest days do not count against you, and you earn another for every five tasks.</p>`;
     $('restBtn').onclick = takeRest; }
-  $('people').innerHTML = Object.entries(PEOPLE).map(([k, p]) => {
+  $('people').innerHTML = Object.entries(PEOPLE).filter(([k]) => k === openPerson).map(([k, p]) => {
     const t = S.trust[k], tier = t >= 7 ? 2 : t >= 3 ? 1 : 0, line = p.lines[tier][(talkIdx[k] || 0) % 2], open = aiOn() && openTalk === k, md = moodOf(k);
     if (taken()[k]) return `<li class="gone"><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3></div><span class="small muted">${p.role}</span></div></div><span class="say">Taken by the Tallymen. ${p.name} is held in their stockade until you bring them back.</span></li>`;
     return `<li><div class="thead">${pic('p-' + k, 'face', p.name)}<div><div class="who"><h3>${p.name}</h3><span class="pips" role="img" aria-label="Trust ${t} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</span></div>
@@ -1806,6 +1872,23 @@ function renderCamp(){
   $('builds').querySelectorAll('button[data-b]').forEach(btn => btn.onclick = () => doBuild(BUILDS.find(x => x.k === btn.dataset.b)));
   const sl = S.stepLog.date === today() ? S.stepLog : {steps:0};
   renderStepLink();
+  { const CS2 = campState(), w = $('campWarn'), alarm = CS2.warn || ['Watched', 'Marked', 'Raided'].includes(CS2.mood);
+    w.hidden = !alarm; w.textContent = alarm ? CS2.line + ' ' + (CS2.warn || '') + ' Finishing any task keeps the Tallymen away.' : '';
+    const waiting = asks(), a = waiting[0];
+    $('askBox').innerHTML = a ? `<button class="bare ask" id="askGo">${pic('p-' + a.who, 'face sm')}<span><h3>${PEOPLE[a.who].name} is asking for you</h3><span class="small muted">${esc(a.t)}. ${esc(a.sub)}</span></span></button>` : `<p class="small muted">Nobody is asking anything of you just now. ${esc(CS2.line)}</p>`;
+    if ($('askGo')) $('askGo').onclick = () => { sheet = ''; showTab('walk'); window.scrollTo(0, 0); };
+    $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
+      return `<button class="bare${gone ? ' gone' : ''}" data-person="${k}" aria-label="${PEOPLE[k].name}, ${gone ? 'taken by the Tallymen' : m.word}">${pic('p-' + k, 'face')}${!gone && a && a.who === k ? '<i></i>' : ''}<span>${PEOPLE[k].name}</span><em class="${gone ? 'bad' : m.tone}">${gone ? 'taken' : m.word}</em></button>`; }).join('');
+    $('fire').querySelectorAll('button').forEach(b => b.onclick = () => openPersonSheet(b.dataset.person));
+    const rows = [], nr = REPAIRS.find(r => !S.fixed[r.k]), nb = nextBuild();
+    if (nr) rows.push(['house', nr.bad]);
+    if (nb && !S.built[nb.k] && !rows.some(r => r[0] === nb.spot)) rows.push([nb.spot, nb.bad]);
+    BUILDS.filter(b => b.side && !S.built[b.k] && !rows.some(r => r[0] === b.spot)).forEach(b => rows.push([b.spot, b.bad]));
+    $('missing').innerHTML = rows.length ? `<p class="eyebrow">What the camp is missing</p><div class="pack">${rows.map(r => `<button class="bare" data-spot="${r[0]}"><h3>${(SPOTS.find(sp => sp.k === r[0]) || {name:'Camp'}).name}</h3><span>${esc(r[1] || '')}</span></button>`).join('')}</div>` : '';
+    $('missing').querySelectorAll('button').forEach(b => b.onclick = () => { openSpot = b.dataset.spot; tapN++; openSheet('place'); });
+    $('pack').innerHTML = [['journal', 'Journal', S.journal.length + (S.journal.length === 1 ? ' entry' : ' entries')], ['finds', 'Old empire finds', frags().length ? frags().length + ' found' : 'Nothing yet'], ['map', 'Map of the known world', Object.keys(S.places || {}).length + (Object.keys(S.places || {}).length === 1 ? ' place' : ' places')], ['phone', 'Your phone', 'Dead. Settings are kept here.']]
+      .map(r => `<button class="bare" data-open="${r[0]}"><h3>${r[1]}</h3><span>${r[2]}</span></button>`).join('');
+    $('pack').querySelectorAll('button').forEach(b => b.onclick = () => openSheet(b.dataset.open)); }
   { const cm = campMood(), cl = $('campLine'); if (cl) cl.textContent = cm.line;
     const box = $('tallyNow'), y = S.dayStart && S.dayStart.date === today() ? tally() : null;
     if (box) box.innerHTML = y ? `<button class="quiet" id="tallyAsk" style="align-self:flex-start">${tallyOpen ? 'That will do, Pip' : 'Ask Pip for the tally so far'}</button>${tallyOpen ? tallyHtml(y) : ''}` : '';
@@ -1893,7 +1976,7 @@ if (S.home && (qh || (qs && /^\d{1,6}$/.test(qs)))){
   if (got.earned || got.chores) shortcutNews = (got.earned ? got.earned + (got.earned === 1 ? ' new round' : ' new rounds') + ' walked' : '') + (got.earned && got.chores ? ', and ' : '') + (got.chores ? 'Pip marked ' + got.chores + (got.chores === 1 ? ' chore' : ' chores') + ' done' : '') + '.' + (got.bonus ? ' Tobiah trusts you a little more.' : '');
   try { history.replaceState(null, '', location.pathname); } catch {}
 }
-if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; try { history.replaceState(null, '', location.pathname); } catch {} }
+if (qp.get('round') && S.home && !S.walk && inRoundHours(new Date().getHours()) && !hourDone(new Date().getHours())){ tab = 'camp'; openPerson = 'tobiah'; sheet = 'person'; try { history.replaceState(null, '', location.pathname); } catch {} }
 boot(); pushRefresh(); stepsPull();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) stepsPull(); });
 if (PUSH_URL) fetch(PUSH_URL + '/').then(r => r.json()).then(j => { const on = !!(j && j.talk); if (on !== relayOn){ relayOn = on; store.set('lwb-relay', on ? '1' : '0'); render(); } }).catch(() => {});
