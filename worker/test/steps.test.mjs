@@ -49,6 +49,24 @@ await takeSteps(env, code, '15-401', t - 3 * 3600000); assert.equal(await nudged
 assert.equal((await call('/subscribe', {sub, tz:'UTC', from:0, to:24})).status, 200);
 await takeSteps(env, code, '15-400', t - 5 * 60000); assert.equal(await nudged(), false, 'changing the hours keeps the tie');
 
+// A plain total: the server works out the hours. Denver is seven hours behind UTC in November.
+assert.equal((await call('/steps-read', {code, tz:'America/Denver'})).status, 200, 'the game says where the player lives');
+const at = (hh, mm, day = 27) => Date.UTC(2026, 10, day, hh + 7, mm);   // a Denver wall-clock time
+await takeSteps(env, code, '', at(9, 0, 26));   // yesterday's leftovers
+const tot = async (n, when) => (await takeSteps(env, code, null, when, n))[0];
+const hoursNow = async () => (await (await call('/steps-read', {code})).json()).hours;
+assert.deepEqual(await tot('3,000', at(9, 45)), {ok:true, steps:3000});
+assert.deepEqual(await hoursNow(), {9:3000}, 'the first total of the day lands in the hour it came');
+await tot('3400', at(10, 45)); await tot('3400.0', at(11, 45)); await tot('4,100', at(13, 45));
+assert.deepEqual(await hoursNow(), {9:3000, 10:400, 13:700}, 'each later total adds only what is new, to its own hour');
+await tot('4000', at(14, 45)); assert.deepEqual(await hoursNow(), {9:3000, 10:400, 13:700}, 'a total that drops changes nothing');
+await tot('120', at(7, 45, 28)); assert.deepEqual(await hoursNow(), {7:120}, 'a new day starts again');
+assert.equal((await takeSteps(env, code, null, at(8, 0, 28), 'lots'))[1], 200, 'words with no digits count as nothing');
+assert.equal((await takeSteps(env, code, null, at(8, 0, 28), '900000'))[1], 400);
+let rr = await phoneGet('/steps/' + code + '?total=650'); assert.equal((await rr.json()).steps, 650, 'the shortcut link takes a total');
+await takeSteps(env, code, '15-400', t - 5 * 60000); assert.deepEqual(await hoursNow(), {15:400}, 'the hour by hour form still works');
+assert.equal((await call('/steps-read', {code, tz:'UTC'})).status, 200);
+
 assert.equal((await call('/steps-off', {code, endpoint:sub.endpoint})).status, 200);
 assert.equal((await call('/steps-read', {code})).status, 404);
 assert.equal(await nudged(), true, 'disconnected: Tobiah calls as before');
