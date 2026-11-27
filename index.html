@@ -370,12 +370,12 @@ html,body{touch-action:pan-y;overscroll-behavior-x:none;overflow-x:hidden}
     </section>
     <section class="row">
       <button class="quiet" id="unitBtn"></button>
-      <button class="quiet" id="moveHome">Move home base</button>
+      <button class="quiet" id="moveHome">Move your starting point</button>
       <button class="quiet" id="resetBtn">Start the story over</button>
       <button class="quiet" id="replayBtn">Play the opening again in practice mode</button>
     </section>
     <div id="privJournal"></div>
-    <p class="small muted">Your home location and progress are saved only in this browser on this phone. Destinations come from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors and are not checked by anyone. Use your own judgment about where it is safe and allowed to walk, and skip any place that isn't.</p>
+    <p class="small muted">Your starting point and progress are saved only in this browser on this phone. Destinations come from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors and are not checked by anyone. Use your own judgment about where it is safe and allowed to walk, and skip any place that isn't.</p>
   </div>
 </div>
 
@@ -979,13 +979,13 @@ const platform = () => { const u = navigator.userAgent; return /iPhone|iPad|iPod
 const GMAPS_KEY = 'AIzaSyABeK9cERD8PMb_gALajr4ASzRW7Weap60';  // Google Maps Embed API key, locked to this site's address. Empty = OpenStreetMap picture.
 const PRIVACY = `<details class="lochelp priv"><summary>We do not track your location. Details</summary><ol>
   <li>There is no account. The game's one small server only sends walk reminders and carries villager talk, as described below. The people who made this game never receive where you are or where you live.</li>
-  <li>Your home spot, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
+  <li>Your starting point, your walks and your progress are saved only in this browser on this phone. Clearing the site's data or tapping "Start the story over" erases them.</li>
   <li>To pick a destination, the game asks OpenStreetMap's public map service for parks and trails around a rounded point about half a mile (1 km) wide, not your exact position.</li>
-  <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your home to the destination. Your exact home spot is not sent. If you move the end point to where you are standing, that spot becomes the destination that is sent.</li>
+  <li>To draw the walking path, the game asks a public OpenStreetMap routing service for a route from a point within about a block of your starting point to the destination. Your exact starting point is not sent. If you move the end point to where you are standing, that spot becomes the destination that is sent.</li>
   <li>The map in the game is drawn on your phone. If you tap the small map icon or "Open in Google Maps", Google receives where you are and the destination so it can draw the route. Nothing goes to Google unless you tap one of those.</li>
   
-  <li>If you turn on Tobiah's calls, a small reminder server run by the game's maker keeps the address your phone uses for notifications, your time zone and the hours you chose, so it can call you. It never receives your location, your home or your progress, and turning the calls off deletes it.</li>
-  <li>When a villager talks back, what you typed and the state of your camp go to Anthropic (through the game's server, unless you added a key of your own), the company that makes the voices, and the reply comes back. The server does not keep the words. It keeps a count of replies per day against a scrambled form of your internet address, so one person cannot use everyone's share. The voices never receive your location, your parks or your home.</li>
+  <li>If you turn on Tobiah's calls, a small reminder server run by the game's maker keeps the address your phone uses for notifications, your time zone and the hours you chose, so it can call you. It never receives your location, your starting point or your progress, and turning the calls off deletes it.</li>
+  <li>When a villager talks back, what you typed and the state of your camp go to Anthropic (through the game's server, unless you added a key of your own), the company that makes the voices, and the reply comes back. The server does not keep the words. It keeps a count of replies per day against a scrambled form of your internet address, so one person cannot use everyone's share. The voices never receive your location, your parks or your starting point.</li>
   <li>Like every website, the companies that deliver this page, its fonts and the park list can see your internet address, which shows roughly what city you are in. The game cannot prevent that.</li></ol></details>`;
 function locHelp(open){
   const mine = platform();
@@ -1365,7 +1365,7 @@ function endBattle(won){
   buzz(); save(); render();
 }
 function unload(){
-  announce('Back at Hollow Ash', 'You are home. Open the game to unload.', [784, 659, 523]);
+  announce('Back at Hollow Ash', 'You are back at camp. Open the game to unload.', [784, 659, 523]);
   const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
   const before = {sleep:sleep(), carry:gear(), rank:rankIdx(), lvl:level()};
   const notes = [];
@@ -1973,7 +1973,7 @@ function renderStart(el){
     `<p><span class="say">"Take his cloak. Quick."</span> ${L.build === 'big' ? 'It barely closes across your chest. His boots are far too small for you.' : L.build === 'slight' ? 'It hangs off you like a tent. His boots are far too big for you.' : 'It fits, near enough. His boots do not, by a size.'} She looks at your clogs again and gives up. <span class="say">"Then you run in those."</span></p><p>She and the boy go through both men. You are handed the rope that was meant for their wrists, a belt knife and a half-full waterskin. The boy keeps one of the notched sticks. He has not taken his eyes off the light at your shoulder. <span class="say">"That is a glim,"</span> the woman says. <span class="say">"They took it off somebody. It seems to think it is yours now."</span> She has one too, tucked under her collar. The boy does not. Your phone says 4%. Down the valley, torches are coming.</p>`) + next('Next');
   else if (step === 4 && !walking) h = scene('intro-climb', 'The climb', climbAlt,
     '<p>The woman points up the mountain, into the dark. <span class="say">"Up. Now. Before those torches find the road."</span></p><p>The glim lifts off your shoulder and drifts a little way ahead of you, the way a dog does when it knows you are coming.</p>')
-    + `<div class="panel"><h3>This part is real</h3><p class="small">Stand up, go outside and walk. Your glim goes ahead of you. About ${fmtDist(CLIMB.out)} from where you start, it stops. Then it leads you back. Five minutes in all.</p><p class="small">Where you start is where your camp will stand, so start from your own door if you can.</p>
+    + `<div class="panel"><h3>This part is real</h3><p class="small">Stand up, go outside and walk. Your glim goes ahead of you. About ${fmtDist(CLIMB.out)} from where you start, it stops. Then it leads you back. Five minutes in all.</p><p class="small">Your camp will stand where this walk starts. You can change that afterwards.</p>
       ${practice ? '' : '<p class="small"><b>Your location stays on your phone.</b> The game only uses it to measure your walk. Your phone will ask to share it. Tap <b>Allow</b>.</p>' + PRIVACY}</div>
       ${dots}<button class="primary" id="climbGo">Follow the glim</button><button id="introBack">Back</button><button class="quiet" id="climbSkip">I can't walk right now</button>`;
   else if (step === 5) h = scene('intro-climb', 'Halfway up', climbAlt,
@@ -1991,8 +1991,8 @@ function renderStart(el){
     ${dots}<button class="quiet" id="climbSkip">I can't walk right now</button>`;
   else h = scene('intro-edge', 'Hollow Ash', 'You, in the stolen cloak by the campfire with a bowl, the others watching from across the flames, a ruined arch behind them',
     `${G.skip ? pipSays : ''}<p>${G.skip ? '' : 'By the top of the path your glim is the brightest thing on the mountain. '}At the top is a camp: one longhouse, a fire, eleven people who look like they have been running for a long time. A hunter called Dack wants you gone. <span class="say">"${cap(P[0])} fell on a Tallyman,"</span> says the woman, whose name is Maren. <span class="say">"That is not the same as helping, but it is not nothing. You work, you eat. You sleep outside. That is the offer."</span></p><p>She nods at the broken arch. <span class="say">"That is the door your kind come through. It has been dead longer than I have been alive. If anything ever sends you home, it is that."</span> Your phone hits 1% and goes black. You keep it anyway.</p>`)
-    + (S.home ? '<div class="panel"><h3>Are you at home right now?</h3><p class="small">Hollow Ash stands at your own door, because every walk starts there and ends there. If you are at work or out somewhere, the camp can stand here for now and move home with you later.</p></div>' : '') + dots
-    + (S.home ? '<button class="primary" id="begin">Take the offer. I am at home</button><button id="beginAway">Take the offer. I am somewhere else</button>' : '<button class="primary" id="begin">Take the offer</button>');
+    + (S.home ? '<div class="panel"><h3>Is this where you want to start your walks from?</h3><p class="small">Every walk in the game starts from your camp and ends back at it. The camp is standing where you began that first walk. If you would rather start from somewhere else, say so, and you can move it when you are there.</p></div>' : '') + dots
+    + (S.home ? '<button class="primary" id="begin">Take the offer. Start my walks from here</button><button id="beginAway">Take the offer. I will pick another spot later</button>' : '<button class="primary" id="begin">Take the offer</button>');
   el.innerHTML = h;
   const go = n => { G.step = n; save(); render(); window.scrollTo(0, 0); };
   const pre = {0:'intro-fall', 1:'intro-landing', 2:'intro-cloak', 3:'intro-climb', 6:'intro-edge'}[step]; if (pre) new Image().src = 'art/' + pre + '.jpg';
@@ -2117,16 +2117,16 @@ function render(){
     if (!S.start) S.start = freshStart();
     renderStart(el);
   } else if (!S.home){
-    el.innerHTML = `${villagePic('scene')}<p class="eyebrow">Where the camp stands</p><h2>Hollow Ash is wherever you live</h2>
-      <p>Stand at your front door and tap the button. Every task starts here and everything you carry comes back here.</p>
+    el.innerHTML = `${villagePic('scene')}<p class="eyebrow">Where the camp stands</p><h2>Where do your walks start?</h2>
+      <p>Stand where you want to start your walks from and tap the button. Every task starts here and everything you carry comes back here.</p>
       ${wantHome ? '<p class="num" id="gpsLine">Finding you…</p><button id="useRough" hidden>Use this rough spot anyway</button><p class="small muted" id="gpsDiag"></p>' : ''}
       ${practice ? '' : '<div class="panel privbox"><p class="small"><b>Your location stays on your phone.</b> We do not track, collect or store where you are. The game only uses it to measure your walk.</p>' + PRIVACY + '</div>'}
       ${!practice && !wantHome && !geoError ? '<p class="small muted">Your phone will ask to share your location. Tap <b>Allow</b>.</p>' : ''}
       ${geoError ? `<p style="color:var(--warn)">${geoError}</p>` : ''}
-      ${S.start && !wantHome ? '<p class="small">Not at home right now? Set the camp where you are for now. You can move it from the Camp screen once you are at your own door.</p>' : ''}
+      ${S.start && !wantHome ? '<p class="small">Not where you would usually start from? Set the camp here for now. You can move it from the Camp screen later.</p>' : ''}
       <div class="row">
         <button class="primary grow" id="setHome">${practice ? 'Set practice camp' : geoBlocked ? 'Try again' : 'Set camp here'}</button>
-        ${S.start && !wantHome ? '<button class="grow" id="setAway">I am not at home. Camp here for now</button>' : ''}
+        ${S.start && !wantHome ? '<button class="grow" id="setAway">Camp here for now. I will move it later</button>' : ''}
         ${practice ? '' : '<button class="grow" id="goPractice">Try practice mode</button>'}
       </div>
       ${practice ? '' : geoBlocked ? locHelp(true) : '<details class="lochelp top"><summary>Trouble with location?</summary>' + locHelp(true) + '</details>'}`;
@@ -2225,7 +2225,7 @@ function tick(){
       if (pos){
         const rough = pos.acc > 150;
         $('gpsLine').textContent = 'Finding you… your phone says it knows where you are to within ' + far(pos.acc) + '.' + (rough && waited > 8000 ? ' That is too rough to play well. Go outside or stand by a window, make sure Wi-Fi is on, and on iPhone check that Precise Location is on for your browser.' : '');
-        const u = $('useRough'); if (u){ u.hidden = !(rough && waited > 8000); u.onclick = () => { S.home = {lat:pos.lat, lng:pos.lng}; S.offer = null; wantHome = 0; newDay(); note('You marked camp from a rough location. Move home base from your phone, on the You screen, once you have a better signal.'); render(); }; }
+        const u = $('useRough'); if (u){ u.hidden = !(rough && waited > 8000); u.onclick = () => { S.home = {lat:pos.lat, lng:pos.lng}; S.offer = null; wantHome = 0; newDay(); note('You marked camp from a rough location. Move your starting point from your phone, on the You screen, once you have a better signal.'); render(); }; }
       } else if (waited > 12000) $('gpsLine').textContent = 'Still no location from your phone' + (gpsWhy ? ' (' + gpsWhy + ')' : '') + '. Check that Location is on for the phone itself, turn Wi-Fi on, and step outside. The game keeps trying.';
     }
     return;
@@ -2277,7 +2277,7 @@ function drawWorld(){
   g.fillStyle = col('--ink'); g.fillRect(w / 2 - 7, h / 2 - 7, 14, 14); g.fillText('CAMP', w / 2, h / 2 - 12);
   if (pos){ const U = P(xy(pos)); g.fillStyle = '#fff'; g.beginPath(); g.arc(U.x, U.y, 5, 0, 7); g.fill(); g.strokeStyle = col('--ember'); g.lineWidth = 2.5; g.stroke(); }
   g.fillStyle = col('--muted'); g.textAlign = 'left'; g.fillText('N ↑', 10, 18);
-  const n = list.length, line = $('worldLine'); if (line) line.textContent = n ? n + (n === 1 ? ' place' : ' places') + ' found. Each kind has its own color, matching the stores bar. The white dot is you. Moving home base wipes the map.' : 'Nothing found yet. Places appear here once you reach them, and they stay put.';
+  const n = list.length, line = $('worldLine'); if (line) line.textContent = n ? n + (n === 1 ? ' place' : ' places') + ' found. Each kind has its own color, matching the stores bar. The white dot is you. Moving your starting point wipes the map.' : 'Nothing found yet. Places appear here once you reach them, and they stay put.';
 }
 /* The walking map. It can be zoomed (buttons or a pinch) and, on a walk, turned so that the way you are facing is up.
    Zoomed out it shows the whole trip; zoomed in it follows you. Nothing here is saved with the game except the choice
@@ -2507,7 +2507,8 @@ function renderCamp(){
       const where = {tobiah:'Tobiah sits at the fire now, and what he needs is on the Walk screen. The fire is yours to feed from tonight.', steps:'Today\'s steps are on the You screen now, under your glim. Pip\'s dare is on the Walk screen.', dack:'Dack is at the fire now. His work is on the Walk screen, and some of it is a fight.', isla:'Isla is at the fire now. The camp\'s water is yours to carry too.', oona:'Oona is at the fire now. Reeds are on the Walk screen, and her loom is at the longhouse.', build:'Tap a place in the picture to see what is broken there and what it would take to mend.', rounds:'Tap Tobiah at the fire to see his rounds.'};
       gb.innerHTML = N ? `<div class="panel"><div class="newsrow">${pic('p-' + N.who, 'face sm')}<div><p class="eyebrow">New at the fire</p><h3>${esc(N.h)}</h3></div></div><p class="say">${esc(N.t)}</p><p class="small muted">${where[nk]}</p><button class="primary" id="growOk">Good</button></div>` : '';
       if ($('growOk')) $('growOk').onclick = () => { G.news.shift(); save(); renderCamp(); };
-      if (G && G.away && S.home && !N){ gb.innerHTML = `<div class="panel"><p class="eyebrow">Camp for now</p><p class="small">You were away from home when you arrived, so Hollow Ash stands where you took that first walk. You can play from here. When you are standing at your own door, move the camp there. The places you have found near here will be left behind.</p><button id="homeNow">I am home now. Move the camp here</button></div>`;
+      if (G && G.away && S.home && !N){ gb.innerHTML = `<div class="panel"><p class="eyebrow">Camp for now</p><p class="small">You said you would pick another spot to start your walks from, so Hollow Ash stands where you took that first walk for now. You can play from here. When you are standing where you want your walks to start, move the camp there. The places you have found near here will be left behind.</p><button id="homeNow">Start my walks from here instead</button><button class="quiet" id="homeKeep">Keep the camp where it is</button></div>`;
+        $('homeKeep').onclick = () => { G.away = 0; save(); renderCamp(); };
         $('homeNow').onclick = () => { G.away = 0; S.home = null; S.offer = null; S.places = {}; sheet = ''; save(); render(); window.scrollTo(0, 0); }; } }
     $('fire').innerHTML = Object.keys(PEOPLE).map(k => { const gone = !!taken()[k], m = gone ? null : moodOf(k);
       if (!met(k)) return `<span class="shade" role="img" aria-label="Someone you have not met yet">${pic('p-' + k, 'face')}<span>&nbsp;</span><em>a shape</em></span>`;
