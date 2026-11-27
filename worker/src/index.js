@@ -146,7 +146,10 @@ export default {
   async fetch(request, env){
     const url = new URL(request.url), origin = request.headers.get('Origin') || '';
     if (request.method === 'OPTIONS') return reply({}, 200, origin);
-    if (request.method === 'GET' && url.pathname === '/') return reply({ok:true, what:'The Long Way Back reminders', talk:!!env.ANTHROPIC_API_KEY}, 200, origin);
+    if (request.method === 'GET' && url.pathname === '/') return reply({ok:true, what:'The Long Way Back reminders', talk:!!env.ANTHROPIC_API_KEY,
+      // Names only, never values: shows whether the key secret reached this server and under what exact name.
+      seen:Object.keys(env).filter(k => /anthropic|api|key/i.test(k)).map(k => ({name:JSON.stringify(k), type:typeof env[k], empty:typeof env[k] !== 'string' || env[k].trim().length === 0})),
+      at:new Date().toISOString()}, 200, origin);
     if (request.method === 'GET' && url.pathname === '/key') return reply({key:(await vapid(env)).pub}, 200, origin);
     if (request.method !== 'POST') return reply({error:'not found'}, 404, origin);
     if (origin !== GAME_ORIGIN) return reply({error:'only the game may call this'}, 403, origin);
