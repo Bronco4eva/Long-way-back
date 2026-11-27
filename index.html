@@ -936,7 +936,7 @@ function showArrive(){
   const T = TASKS[m.id], place = m.name ? esc(m.name) : 'the ' + SITE[T.res], d = document.createElement('div');
   d.id = 'arriveCard'; d.className = 'arrive'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-labelledby', 'arriveH');
   d.innerHTML = `<div>${pic('s-' + artFor(T), 'scene strip', 'The ' + SITE[T.res])}<p class="eyebrow">You made it</p><h2 id="arriveH">You have reached ${place}</h2>
-    <p>${T.battle === 'dare' ? 'Pip is waiting with a dare. A short workout, then home.' : T.battle ? 'You are not alone here. A short workout to hold your ground, then home.' : T.rescue || T.arc ? 'You have what you came for. Now walk it home to Hollow Ash.' : 'Your pack is loaded. Now carry it home to Hollow Ash.'}</p>
+    <p>${T.battle === 'dare' ? 'Pip is waiting with a dare. A short workout, then home.' : T.battle ? 'You are not alone here. A short workout to hold your ground, then home.' : T.rescue || T.arc ? 'You have what you came for. Now walk it home to Hollow Ash.' : 'Your pack is loaded. Carry it home to Hollow Ash' + (legCount(m) < stops() && S.board && S.board.ids.some(id => !S.board.done[id] && id !== m.id && !(m.legs || []).some(l => l.id === id)) ? ', or pick another task from here on the walk screen.' : '.')}</p>
     <p class="small muted num">${fmtDist(m.meters)} walked so far.</p><button class="primary" id="arriveOk">${T.battle ? 'Start the workout' : 'Head for home'}</button></div>`;
   document.body.appendChild(d);
   $('arriveOk').onclick = () => { m.arriveSeen = true; save(); d.remove(); };
@@ -995,7 +995,7 @@ async function addRoute(o){
   const k = ptKey(o.site);
   if (routeTry.k !== k) routeTry = {k, n:0, t:0};
   routeTry.n++; routeTry.t = Date.now(); routeBusy = true;
-  const rt = await fetchRoute(S.home, o.site); routeBusy = false;
+  const rt = await fetchRoute(o.from || S.home, o.site); routeBusy = false;
   if (!rt) return;
   // Match by place, not by object: the offer becomes a new mission object when you set out, and a reload rebuilds both.
   let hit = false;
@@ -1112,6 +1112,7 @@ function moveEnd(p){
   if (S.mission && pos) onFix(pos);
 }
 function wireMove(){
+  document.querySelectorAll('[data-chain]').forEach(b => b.onclick = () => chainTo(b.dataset.chain));
   if ($('moveOpen')) $('moveOpen').onclick = () => { moveOpen = true; moveSay = ''; render(); const c = $('radar'); if (c) c.scrollIntoView({block:'center', behavior:'smooth'}); };
   if ($('moveDone')) $('moveDone').onclick = () => { moveOpen = false; moveSay = ''; render(); };
   if ($('moveHere')) $('moveHere').onclick = () => { if (pos){ moveOpen = false; moveEnd(pos); } };
@@ -1135,6 +1136,7 @@ const target = m => Math.round(MOVES[m.move].base * (1 + rankIdx() * 0.25) * (TA
 function arrive(){
   const m = S.mission; m.arrived = Date.now(); m.arriveSeen = false;
   announce('You made it', 'You have reached ' + (m.name || 'the ' + SITE[TASKS[m.id].res]) + '. Open the game for what comes next.', [523, 659, 784, 1047]);
+  if (m.from){ m.route = null; m.routeM = 0; delete m.from; routeTry = {k:'', n:0, t:0}; }
   const pk = placeKey(TASKS[m.id]), had = places()[pk];
   if (!had || ptKey(had.site) !== ptKey(m.site)){
     places()[pk] = {site:m.site, oneWay:m.oneWay, name:m.name, real:!!m.real, onTrail:!!m.onTrail, route:m.route || null, routeM:m.routeM || 0, found:today()};
@@ -1153,29 +1155,60 @@ function endBattle(won){
   if (won) S.stats.wins++;
   buzz(); save(); render();
 }
-function unload(){
-  announce('Back at Hollow Ash', 'You are home. Open the game to unload.', [784, 659, 523]);
-  const m = S.mission, T = TASKS[m.id], planned = m.oneWay * 2, elapsed = (Date.now() - m.t0) / 1000;
-  const before = {sleep:sleep(), carry:gear(), rank:rankIdx(), lvl:level()};
-  const notes = [];
-  const speed = elapsed > 0 ? m.meters / elapsed : 0, simd = pos && pos.sim;
-  let tr = T.tr, haul = Math.min(carry(), Math.max(1, Math.round(planned / 100)));
-  if (m.won === false){ haul = Math.ceil(haul / 2); tr = Math.floor(tr / 2); notes.push('You fell back, so you came home with half'); }
-  if (m.won === true) notes.push(T.battle === 'dare' ? 'You beat the dare' : 'You held your ground');
-  if (m.ride > planned * 0.3){ haul = Math.ceil(haul / 2); notes.push('Part of that was too fast to be on foot, so it counts for less'); }
-  else if (!simd && speed >= 2.4){ tr += 1; notes.push('You ran it. ' + PEOPLE[T.g].name + ' noticed'); }
+/* More than one task in a walk. After reaching a place you can take another task from where you stand instead of going
+   home first. Each finished stop is kept in m.legs; the walk's one pack (carry()) is shared between the gathering stops,
+   and how many stops your legs have in them (stops()) grows with Second wind. Everything is settled at camp. */
+const stops = () => 2 + (perks().wind || 0);
+const legCount = m => (m.legs || []).length + 1;
+function chainChoices(m){
+  const T = TASKS[m.id];
+  if (!m || m.phase !== 'back' || T.rescue || T.arc || !S.board) return [];
+  const used = (m.legs || []).map(l => l.id).concat(m.id);
+  return S.board.ids.filter(id => !S.board.done[id] && !used.includes(id) && !TASKS[id].arc && !TASKS[id].rescue);
+}
+let chainBusy = false;
+function chainBox(m){
+  const ids = chainChoices(m); if (!ids.length) return '';
+  if (chainBusy) return '<div class="panel fixbox"><p class="small muted">Working out where that is from here…</p></div>';
+  const n = legCount(m), max = stops(), here = pos || m.site;
+  const pack = `One pack for the whole walk: you can carry ${carry()} in all (${carryName().toLowerCase()}), shared between the tasks. A better pack means more from each stop.`;
+  if (n >= max) return `<div class="panel fixbox"><h3>While you are out</h3><p class="small muted">${n} stops is as far as your legs go in one walk. Second wind, on the You screen, adds another.</p></div>`;
+  return `<div class="panel fixbox"><h3>While you are out</h3><p class="small">Take another task from here instead of going home first. It would be stop ${n + 1} of the ${max} your legs can manage in one walk.</p>
+    <ul class="tasks">${ids.map(id => { const T = TASKS[id], k = places()[placeKey(T)];
+      return `<li><p class="small"><b>${esc(T.t)}</b>, for ${PEOPLE[T.g].name}. ${k ? 'The ' + placeName(placeKey(T)) + ' is ' + fmtDist(dist(here, k.site)) + ' from here.' : 'New ground, about ' + fmtDist(T.km * 500) + ' from camp.'}${T.battle ? ' Expect a workout.' : ''}</p><button data-chain="${id}">Go there next</button></li>`; }).join('')}</ul>
+    <p class="small muted">${pack}</p></div>`;
+}
+async function chainTo(id){
+  const m = S.mission; if (!m || chainBusy || !chainChoices(m).includes(id) || legCount(m) >= stops()) return;
+  const T = TASKS[id]; let n = places()[placeKey(T)];
+  if (!n){ chainBusy = true; render(); try { n = await pickSite(T.km * 500); } finally { chainBusy = false; } if (S.mission !== m || m.phase !== 'back'){ render(); return; } }
+  (m.legs = m.legs || []).push({id:m.id, oneWay:m.oneWay, won:m.won, frag:m.frag == null ? null : m.frag, item:m.item || null});
+  Object.assign(m, {id, site:n.site, oneWay:n.oneWay, name:n.name || '', real:!!n.real, onTrail:!!n.onTrail, route:null, routeM:0, from:pos ? {lat:pos.lat, lng:pos.lng} : m.site,
+    phase:'out', won:null, reps:0, bt0:0, move:Math.floor(Math.random() * MOVES.length), arrived:0, arriveSeen:false, near:null});
+  delete m.frag; delete m.item; delete m.site0;
+  moveOpen = false; moveSay = ''; fixSay = ''; fixOpen = false; routeTry = {k:'', n:0, t:0};
+  save(); wantRoute(); render();
+  if (pos) onFix(pos);
+}
+// Settles one stop of a walk at camp: what it brought in, whose trust moved, and what was found there.
+function settleLeg(leg, share, flags, notes){
+  const T = TASKS[leg.id];
+  let tr = T.tr, haul = Math.min(share, Math.max(1, Math.round(leg.oneWay * 2 / 100)));
+  if (leg.won === false){ haul = Math.ceil(haul / 2); tr = Math.floor(tr / 2); notes.push('You fell back, so you came home with half'); }
+  if (leg.won === true) notes.push(T.battle === 'dare' ? 'You beat the dare' : 'You held your ground');
+  if (flags.ride) haul = Math.ceil(haul / 2); else if (flags.ran) tr += 1;
   let freed = '';
   if (T.rescue){
     haul = 0; tr = 0; notes.length = 0;
     const who = takenList()[0];
-    if (m.won && who){
+    if (leg.won && who){
       const n = PEOPLE[who].name; freed = who; delete S.taken[who]; addTrust(who, 2); addTrust('maren', 1);
       notes.push('You broke the guard at the stockade and walked ' + n + ' out');
       note('You walked ' + n + ' out of the Tallymen stockade and all the way home. ' + n + ' did not let go of your sleeve until the fire was in sight. Maren put a bowl in your hands herself.');
     } else { notes.push('The guards drove you off. Rest, then go again'); note('The Tallymen drove you off at the stockade. Whoever they hold is still in there. Maren says go again.'); }
   } else if (T.arc){
     S.fever.done = true; addTrust('isla', 3); addTrust('tobiah', 2); addTrust('maren', 1);
-    if (m.won === false){ S.stock.food = Math.max(0, S.stock.food - 3); notes.push('The Tallymen took their toll in food at the crossing'); }
+    if (leg.won === false){ S.stock.food = Math.max(0, S.stock.food - 3); notes.push('The Tallymen took their toll in food at the crossing'); }
     note('You put the feverbark in Tobiah\'s hands with a day\'s walk still in your legs. By morning Wren was cool to the touch. Isla held your arm and did not let go for a while.');
     haul = 0;
   } else {
@@ -1183,24 +1216,43 @@ function unload(){
     S.stock[T.res] += haul; addTrust(T.g, tr);
   }
   let got = null;
-  if (m.item && !items().includes(m.item)){
-    got = item(m.item); items().push(got.k);
+  if (leg.item && !items().includes(leg.item)){
+    got = item(leg.item); items().push(got.k);
     Object.entries(got.trust || {}).forEach(([k, v]) => addTrust(k, v));
     Object.entries(got.stock || {}).forEach(([k, v]) => S.stock[k] += v);
     note('You brought home a find: ' + got.name.toLowerCase() + '. ' + got.does);
   }
-  if (!T.rescue) S.board.done[m.id] = true;
+  if (!T.rescue) S.board.done[leg.id] = true;
+  S.stats.tasks++;
+  if (S.stats.tasks % 5 === 0 && neglect().rests < 3 + (perks().rest || 0)){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
+  return {id:leg.id, haul, tr, freed, frag:leg.frag, item:got ? got.k : null};
+}
+function unload(){
+  announce('Back at Hollow Ash', 'You are home. Open the game to unload.', [784, 659, 523]);
+  const m = S.mission, T = TASKS[m.id], elapsed = (Date.now() - m.t0) / 1000;
+  const legs = (m.legs || []).concat([{id:m.id, oneWay:m.oneWay, won:m.won, frag:m.frag, item:m.item}]);
+  const planned = legs.reduce((n, l) => n + l.oneWay * 2, 0);
+  const before = {sleep:sleep(), carry:gear(), rank:rankIdx(), lvl:level()};
+  const notes = [];
+  const speed = elapsed > 0 ? m.meters / elapsed : 0, simd = pos && pos.sim;
+  const flags = {ride:m.ride > planned * 0.3, ran:false}; flags.ran = !flags.ride && !simd && speed >= 2.4;
+  // One pack for the whole walk, shared evenly between the stops that gather something.
+  const cap = carry(), gather = legs.filter(l => !TASKS[l.id].rescue && !TASKS[l.id].arc); let gi = 0;
+  const done = legs.map(l => { const g = gather.includes(l), i = g ? gi++ : 0; return settleLeg(l, g ? Math.max(1, Math.floor(cap / gather.length) + (i < cap % gather.length ? 1 : 0)) : cap, flags, notes); });
+  if (flags.ride) notes.push('Part of that was too fast to be on foot, so it counts for less');
+  else if (flags.ran) notes.push('You ran it. ' + PEOPLE[T.g].name + ' noticed');
+  if (legs.length > 1) notes.push('One pack, ' + legs.length + ' tasks: the load was shared between them');
+  const main = done[done.length - 1], {haul, tr, freed} = main, got = main.item ? item(main.item) : null;
   { const N = neglect(); N.lastHelp = today(); N.stage = 0; }
   const steps = Math.round(m.meters / 0.78);
-  S.stats.meters += m.meters; S.stats.tasks++; S.stats.steps += steps;
-  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag, item:got ? got.k : null};
-  if (S.stats.tasks % 5 === 0 && neglect().rests < 3 + (perks().rest || 0)){ neglect().rests++; note('Maren says you have earned a rest when you need one. You have ' + neglect().rests + ' banked.'); }
+  S.stats.meters += m.meters; S.stats.steps += steps;
+  S.last = {id:m.id, haul, tr, meters:m.meters, ms:Date.now() - m.t0, steps, notes, freed, frag:m.frag, item:got ? got.k : null, more:done.slice(0, -1).map(d => ({id:d.id, haul:d.haul}))};
   S.mission = null;
   if (sleep() !== before.sleep) note('Maren moved your bedroll without a word. Tonight you sleep here: ' + sleep().toLowerCase() + '.');
   if (gear() !== before.carry) note('Oona threw something at your chest. ' + carryName() + '. You can carry ' + carry() + ' a trip now.');
   if (rankIdx() !== before.rank) note('Somebody called you ' + RANKS[rankIdx()][1] + ' instead of Stranger, and nobody corrected them.');
   if (level() !== before.lvl) note('Something has changed in you. Level ' + level() + '. You have a point to spend on the You screen.');
-  if (S.stats.tasks === 1) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
+  if (S.stats.tasks === legs.length) note('First task done. Nobody thanked you. Somebody did leave a bowl by the embers.');
   newDay(); buzz();
   if (wake){ try { wake.release(); } catch {} wake = null; }
   render();
@@ -1694,7 +1746,7 @@ function render(){
         ${practice ? '<button class="primary grow" id="simWalk">Walk 100 m</button>' : '<a class="linkbtn grow" id="mapLink" target="_blank" rel="noopener" href="#">Open in Google Maps</a>'}
         <button class="quiet" id="abandon">Turn back</button>
       </div>
-      ${out ? moveBox() : ''}
+      ${out ? moveBox() : chainBox(m)}
       ${practice || !out ? '' : fixBox(T)}
       <p class="small muted" id="gpsLine"></p>
       ${practice ? '' : '<button class="primary" id="gpsRetry" hidden>Tap to find my location</button><p class="small muted" id="gpsDiag"></p>'}`;
@@ -1731,7 +1783,7 @@ function render(){
     const L = S.last; let h = '';
     if (L){
       const T = TASKS[L.id];
-      h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.rescue ? (L.freed ? PEOPLE[L.freed].name + ' is home' : 'Driven off at the stockade') : T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>
+      h += `<div class="result"><p class="eyebrow">Back at camp</p><h2 class="num">${T.rescue ? (L.freed ? PEOPLE[L.freed].name + ' is home' : 'Driven off at the stockade') : T.arc ? 'Feverbark delivered' : '+' + L.haul + ' ' + RES[T.res].toLowerCase()}</h2>${(L.more || []).map(x => TASKS[x.id] && x.haul ? '<h2 class="num">+' + x.haul + ' ' + RES[TASKS[x.id].res].toLowerCase() + '</h2>' : '').join('')}
         <p class="small num">${fmtDist(L.meters)} in ${fmtTime(L.ms)}, about ${L.steps.toLocaleString()} steps.${L.tr > 0 && !T.arc ? ' ' + PEOPLE[T.g].name + ' trusts you a little more.' : ''}${L.notes.length ? ' ' + L.notes.join('. ') + '.' : ''}</p>${L.frag != null ? `<div class="frag"><p class="eyebrow">${String(L.frag).startsWith('road') ? 'Found on the way' : 'Found at the ' + SITE[T.res]}</p><p class="say">${esc(findText(L.frag))}</p></div>` : ''}${L.item && item(L.item) ? `<div class="frag item"><p class="eyebrow">You found something useful</p><p class="say"><b>${esc(item(L.item).name)}.</b> ${esc(item(L.item).found)}</p><p class="small">${item(L.item).who === 'you' ? 'Yours to keep. ' : 'For ' + PEOPLE[item(L.item).who].name + '. '}${esc(item(L.item).does)}</p></div>` : ''}</div>`;
     }
     const arc = S.fever && !S.fever.done && !S.fever.failed, tk = takenList(), CS = campState();
@@ -1869,7 +1921,7 @@ function drawRadar(){
     const q = P(xy(m.site0 || m.site)); g.save(); g.setLineDash([5, 5]); g.strokeStyle = col('--warn'); g.lineWidth = 2; g.beginPath(); g.arc(q.x, q.y, moveReach(m) * k, 0, 7); g.stroke(); g.restore();
   } else for (let r = 1; r <= 3; r++){ g.beginPath(); g.arc(ax, ay, (h / 2 - 8) * r / 3, 0, 7); g.stroke(); }
   if (route.length > 1){
-    const R = [H].concat(route.map(P)); g.fillStyle = col('--water'); let carry = 0;
+    const R = [m.from ? P(xy(m.from)) : H].concat(route.map(P)); g.fillStyle = col('--water'); let carry = 0;
     for (let i = 1; i < R.length; i++){
       const dx = R[i].x - R[i - 1].x, dy = R[i].y - R[i - 1].y, L = Math.hypot(dx, dy); if (!L) continue;
       let d = carry; for (; d <= L; d += 9){ const x = R[i - 1].x + dx * d / L, y = R[i - 1].y + dy * d / L; if (x < -5 || y < -5 || x > w + 5 || y > h + 5) continue; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); }
