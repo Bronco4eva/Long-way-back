@@ -1855,11 +1855,11 @@ function drawRadar(){
   const all = pts.concat(trail, route), follow = mapZoom > 1 && pos;
   // Turned, the trip has to fit whichever way round it is, so fit a circle rather than a box.
   const ext = Math.max(40, ...all.map(p => turned ? Math.hypot(p.x, p.y) : Math.max(Math.abs(p.x) * (h / w), Math.abs(p.y))));
-  const k = ((turned ? Math.min(w, h) : h) / 2 - 28) / ext * mapZoom;
+  const k = ((turned ? Math.min(w, h) : h) / 2 - 42) / ext * mapZoom;
   const O = follow ? pts[2] : {x:0, y:0}, ax = w / 2, ay = follow && turned ? h * .62 : h / 2;
   const P = p => { const dx = p.x - O.x, dy = p.y - O.y; return {x:ax + (dx * cs - dy * sn) * k, y:ay - (dx * sn + dy * cs) * k}; };
   // Camp and the destination stay in view when zoomed in: off the edge, they are pinned to it in the right direction.
-  const pin = q => { const lx = 18, rx = w - 64, ty = 26, by = h - 26; if (q.x >= lx && q.x <= rx && q.y >= ty && q.y <= by) return q;
+  const pin = q => { const lx = 18, rx = w - 64, ty = 34, by = h - 26; if (q.x >= lx && q.x <= rx && q.y >= ty && q.y <= by) return q;
     const dx = q.x - ax, dy = q.y - ay, f = Math.min(dx > 0 ? (rx - ax) / dx : dx < 0 ? (lx - ax) / dx : 9, dy > 0 ? (by - ay) / dy : dy < 0 ? (ty - ay) / dy : 9);
     return {x:ax + dx * f, y:ay + dy * f, off:true}; };
   const H = P(pts[0]), T = P(pts[1]);
@@ -1883,7 +1883,10 @@ function drawRadar(){
   g.fillStyle = col('--ink'); g.fillRect(Hp.x - 7, Hp.y - 7, 14, 14); g.fillText('CAMP' + far(Hp, S.home), Hp.x, Hp.y + (Hp.y > h / 2 ? -12 : 22));
   g.globalAlpha = Tp.off ? .75 : 1;
   g.fillStyle = placeColor(placeKey(TASKS[m.id])); g.beginPath(); g.moveTo(Tp.x, Tp.y - 9); g.lineTo(Tp.x + 9, Tp.y); g.lineTo(Tp.x, Tp.y + 9); g.lineTo(Tp.x - 9, Tp.y); g.fill();
-  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase() + far(Tp, m.site), Tp.x, Tp.y + (Tp.y > h / 2 ? -14 : 24));
+  // A little flag planted on the destination, so the end of the walk is easy to pick out.
+  g.strokeStyle = col('--ink'); g.lineWidth = 2; g.beginPath(); g.moveTo(Tp.x, Tp.y); g.lineTo(Tp.x, Tp.y - 26); g.stroke();
+  g.beginPath(); g.moveTo(Tp.x + 1, Tp.y - 26); g.lineTo(Tp.x + 15, Tp.y - 21); g.lineTo(Tp.x + 1, Tp.y - 15); g.fill();
+  g.fillText(SITE[TASKS[m.id].res].split(' ')[0].toUpperCase() + far(Tp, m.site), Tp.x, Tp.y + (Tp.y > h - 40 ? -32 : 24));
   g.globalAlpha = 1;
   if (pos){
     const U = P(pts[2]);
