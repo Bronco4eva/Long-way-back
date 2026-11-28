@@ -46,11 +46,11 @@ p{margin:0}
 /* screen tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom, 0px)}
 .tabs div{max-width:30rem;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
-.looks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.looks button.bare{display:block;border:3px solid transparent;border-radius:6px;padding:2px}.looks button.bare.on{border-color:var(--ember)}.looks .face{display:block;width:100%;height:auto;aspect-ratio:1}
+.looks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.looks button.bare{display:block;border:3px solid transparent;border-radius:6px;padding:2px}.looks button.bare.on{border-color:var(--ember)}.looks .face{display:block;width:100%;height:auto;aspect-ratio:1}
 .glimtap{display:flex!important;flex-direction:column;align-items:center;gap:.3rem;width:100%;padding:1rem 0!important;text-align:center!important;color:var(--ember)!important;font:500 1rem var(--body)!important}
 .climb{display:flex;align-items:center;gap:14px;margin:.4rem 0 .6rem}.climb .big{font-size:3rem;line-height:1}.climb p{margin:.2rem 0 0}
 .fire .shade{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8125rem;color:var(--muted);text-align:center}.fire .shade .face{filter:brightness(0) opacity(.55)}
-.newsrow{display:flex;gap:10px;align-items:center}.looks.six{grid-template-columns:repeat(6,1fr);gap:4px}
+.newsrow{display:flex;gap:10px;align-items:center}.looks.six{grid-template-columns:repeat(7,1fr);gap:4px}
 .tabs button{border:0;border-radius:0;border-top:3px solid transparent;min-height:58px;padding:.3rem .05rem;font:400 1.4rem var(--display);color:var(--muted);margin-top:-2px}
 .tabs button[aria-current="true"]{color:var(--ember);border-top-color:var(--ember)}
 .col{display:flex;flex-direction:column;gap:1.1rem}
@@ -623,7 +623,8 @@ const LOOKS = [
   {k:'c', pic:'hero-c', pron:'she', build:'mid',    alt:'A sturdy woman with red hair in a loose bun and freckles'},
   {k:'d', pic:'hero-d', pron:'he',  build:'slight', alt:'A lean older man with a grey beard'},
   {k:'e', pic:'hero-e', pron:'she', build:'big',    alt:'A heavyset woman with a straight black bob'},
-  {k:'f', pic:'hero-f', pron:'he',  build:'mid',    alt:'A young man with dark curly hair and a moustache'}
+  {k:'f', pic:'hero-f', pron:'he',  build:'mid',    alt:'A young man with dark curly hair and a moustache'},
+  {k:'g', pic:'hero-g', pron:'they', build:'mid',   alt:'A figure in shadow with no face to see'}
 ];
 const look = () => LOOKS.find(l => l.k === S.look) || LOOKS[0];
 const PRON = {he:['he', 'him', 'his', 'man'], she:['she', 'her', 'her', 'woman'], they:['they', 'them', 'their', 'person']};
